@@ -1,0 +1,54 @@
+import Link from "next/link";
+
+type Props = {
+  pathname: string;
+  page: number;
+  pageSize: number;
+  total: number;
+  query: Record<string, string | number | undefined>;
+};
+
+function buildHref(
+  pathname: string,
+  query: Record<string, string | number | undefined>,
+  page: number,
+  pageSize: number,
+): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === "") continue;
+    params.set(key, String(value));
+  }
+  params.set("page", String(page));
+  params.set("page_size", String(pageSize));
+
+  return `${pathname}?${params.toString()}`;
+}
+
+export function Pagination({ pathname, page, pageSize, total, query }: Props) {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const previousPage = Math.max(1, page - 1);
+  const nextPage = Math.min(totalPages, page + 1);
+
+  return (
+    <nav className="mt-8 flex items-center justify-between border-4 border-ink bg-paper p-4 shadow-hard-sm">
+      <Link
+        href={buildHref(pathname, query, previousPage, pageSize)}
+        aria-disabled={page <= 1}
+        className="border-2 border-ink px-3 py-1 text-sm font-bold uppercase tracking-wide hover:bg-accent-yellow aria-disabled:pointer-events-none aria-disabled:opacity-50"
+      >
+        Prev
+      </Link>
+      <p className="text-sm font-semibold uppercase tracking-wide text-ink-muted">
+        Page {page} / {totalPages}
+      </p>
+      <Link
+        href={buildHref(pathname, query, nextPage, pageSize)}
+        aria-disabled={page >= totalPages}
+        className="border-2 border-ink px-3 py-1 text-sm font-bold uppercase tracking-wide hover:bg-accent-yellow aria-disabled:pointer-events-none aria-disabled:opacity-50"
+      >
+        Next
+      </Link>
+    </nav>
+  );
+}
