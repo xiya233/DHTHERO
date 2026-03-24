@@ -5,13 +5,13 @@ import { getCategories, getFeatures, getSiteStats } from "@/lib/api";
 import { formatNumber } from "@/lib/format";
 
 const FIXED_CATEGORY_ORDER = [
-  { key: "all", label: "All" },
-  { key: "video", label: "Video" },
-  { key: "audio", label: "Audio" },
-  { key: "doc", label: "Doc" },
-  { key: "app", label: "App" },
-  { key: "other", label: "Other" },
-];
+  { key: "all", label: "All", icon: "all" },
+  { key: "video", label: "Video", icon: "video" },
+  { key: "audio", label: "Audio", icon: "audio" },
+  { key: "doc", label: "Doc", icon: "doc" },
+  { key: "app", label: "App", icon: "app" },
+  { key: "other", label: "Other", icon: "other" },
+] as const;
 
 export default async function HomePage() {
   const [features, stats, categories] = await Promise.all([
@@ -86,14 +86,17 @@ export default async function HomePage() {
             <Link
               key={item.key}
               href={href}
-              className={`bauhaus-shadow-sm bauhaus-press inline-flex border-2 border-ink px-6 py-2 font-headline text-sm font-bold uppercase tracking-wider transition-all ${
+              className={`bauhaus-shadow-sm bauhaus-press inline-flex items-center gap-2 border-2 border-ink px-6 py-2 font-headline text-sm font-bold uppercase tracking-wider transition-all ${
                 isAll
                   ? "bg-ink text-paper"
                   : "bg-white hover:bg-accent-blue hover:text-paper"
               }`}
             >
-              {item.label}
-              {item.count > 0 ? ` (${formatNumber(item.count)})` : ""}
+              <BauhausIcon name={item.icon} className="size-4 shrink-0" />
+              <span>
+                {item.label}
+                {item.count > 0 ? ` (${formatNumber(item.count)})` : ""}
+              </span>
             </Link>
           );
         })}
