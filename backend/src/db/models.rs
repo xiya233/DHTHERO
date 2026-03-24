@@ -48,3 +48,14 @@ pub struct CategoryCountRow {
     pub category: i16,
     pub count: i64,
 }
+
+#[derive(Debug, Clone, FromRow)]
+pub struct MeiliDocRow {
+    pub info_hash: String,
+    pub name: String,
+    pub category: i16,
+    pub total_size: i64,
+    pub file_count: i32,
+    pub first_seen_at: DateTime<Utc>,
+    pub last_seen_at: DateTime<Utc>,
+}

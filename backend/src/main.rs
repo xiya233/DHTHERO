@@ -4,6 +4,7 @@ mod crawler;
 mod db;
 mod domain;
 mod error;
+mod search;
 mod state;
 
 use anyhow::Context;
@@ -11,13 +12,14 @@ use axum::Router;
 use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::net::TcpListener;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use tracing_subscriber::{EnvFilter, fmt};
 
 use crate::{
     config::AppConfig,
     db::repo,
-    state::{AppState, CrawlerStatus},
+    search::client::MeiliSearchClient,
+    state::{AppState, CrawlerStatus, MeiliStatus},
 };
 
 #[tokio::main]
@@ -38,7 +40,23 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("failed to run sql migrations")?;
 
-    let state = AppState::new(pool.clone(), Arc::new(config.clone()));
+    let meili_client = init_meili_client(&config).await;
+    let state = AppState::new(pool.clone(), Arc::new(config.clone()), meili_client);
+
+    if config.features.meili_enabled {
+        if state.meili_client().is_some() {
+            if config.meili.bootstrap_enabled {
+                search::sync::spawn_bootstrap_job(state.clone());
+            } else {
+                state.set_meili_status(MeiliStatus::Ready).await;
+            }
+        } else {
+            state.set_meili_status(MeiliStatus::Failed).await;
+            warn!(
+                "meili feature enabled but client initialization failed; search will fallback to postgres"
+            );
+        }
+    }
 
     if config.crawler.enabled {
         if let Err(err) = crawler::spawn(state.clone()).await {
@@ -71,6 +89,27 @@ async fn main() -> anyhow::Result<()> {
     .context("axum server failed")?;
 
     Ok(())
+}
+
+async fn init_meili_client(config: &AppConfig) -> Option<Arc<MeiliSearchClient>> {
+    if !config.features.meili_enabled {
+        return None;
+    }
+
+    let client = match MeiliSearchClient::new(&config.meili) {
+        Ok(client) => Arc::new(client),
+        Err(err) => {
+            warn!(error = ?err, "failed to build meilisearch client");
+            return None;
+        }
+    };
+    match client.initialize().await {
+        Ok(()) => Some(client),
+        Err(err) => {
+            warn!(error = ?err, "failed to initialize meilisearch client");
+            None
+        }
+    }
 }
 
 fn init_tracing() {

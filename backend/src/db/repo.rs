@@ -1,5 +1,5 @@
 use crate::db::models::{
-    CategoryCountRow, SiteStatsRow, TorrentDetailRow, TorrentFileRow, TorrentListRow,
+    CategoryCountRow, MeiliDocRow, SiteStatsRow, TorrentDetailRow, TorrentFileRow, TorrentListRow,
 };
 use sqlx::{PgPool, Postgres, QueryBuilder};
 #[derive(Debug, Clone, Copy)]
@@ -218,6 +218,45 @@ pub async fn search_torrents(
     Ok((items, total))
 }
 
+pub async fn fetch_torrents_by_info_hashes(
+    pool: &PgPool,
+    info_hashes: &[String],
+) -> Result<Vec<TorrentListRow>, sqlx::Error> {
+    if info_hashes.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    sqlx::query_as::<_, TorrentListRow>(
+        r#"
+        SELECT
+            t.info_hash,
+            t.name,
+            t.magnet_link,
+            t.category,
+            t.total_size,
+            t.file_count,
+            t.first_seen_at,
+            t.last_seen_at,
+            COALESCE(h.trend_score, 0)::double precision AS trend_score,
+            COALESCE(h.observations, 0)::bigint AS observations
+        FROM unnest($1::text[]) WITH ORDINALITY AS input(info_hash, ord)
+        JOIN torrents t ON t.info_hash::text = input.info_hash
+        LEFT JOIN LATERAL (
+            SELECT
+                COALESCE(SUM(hs.trend_score), 0)::double precision AS trend_score,
+                COALESCE(SUM(hs.observation_count), 0)::bigint AS observations
+            FROM torrent_hot_stats_hourly hs
+            WHERE hs.info_hash = t.info_hash
+              AND hs.bucket_hour >= NOW() - INTERVAL '24 hours'
+        ) h ON TRUE
+        ORDER BY input.ord ASC
+        "#,
+    )
+    .bind(info_hashes)
+    .fetch_all(pool)
+    .await
+}
+
 pub async fn latest_torrents(
     pool: &PgPool,
     params: &LatestParams,
@@ -360,6 +399,56 @@ pub async fn fetch_torrent_detail(
     )
     .bind(info_hash)
     .fetch_optional(pool)
+    .await
+}
+
+pub async fn fetch_meili_doc_by_info_hash(
+    pool: &PgPool,
+    info_hash: &str,
+) -> Result<Option<MeiliDocRow>, sqlx::Error> {
+    sqlx::query_as::<_, MeiliDocRow>(
+        r#"
+        SELECT
+            info_hash,
+            name,
+            category,
+            total_size,
+            file_count,
+            first_seen_at,
+            last_seen_at
+        FROM torrents
+        WHERE info_hash = $1
+        "#,
+    )
+    .bind(info_hash)
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn fetch_meili_docs_batch(
+    pool: &PgPool,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<MeiliDocRow>, sqlx::Error> {
+    sqlx::query_as::<_, MeiliDocRow>(
+        r#"
+        SELECT
+            info_hash,
+            name,
+            category,
+            total_size,
+            file_count,
+            first_seen_at,
+            last_seen_at
+        FROM torrents
+        ORDER BY info_hash ASC
+        LIMIT $1
+        OFFSET $2
+        "#,
+    )
+    .bind(limit.max(1))
+    .bind(offset.max(0))
+    .fetch_all(pool)
     .await
 }
 

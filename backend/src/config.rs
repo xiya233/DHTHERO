@@ -8,6 +8,7 @@ pub struct FeatureFlags {
     pub trending_enabled: bool,
     pub file_tree_enabled: bool,
     pub audit_enabled: bool,
+    pub meili_enabled: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -23,6 +24,16 @@ pub struct CrawlerConfig {
 }
 
 #[derive(Debug, Clone)]
+pub struct MeiliConfig {
+    pub url: String,
+    pub api_key: Option<String>,
+    pub index: String,
+    pub bootstrap_enabled: bool,
+    pub bootstrap_batch_size: u32,
+    pub query_timeout_ms: u64,
+}
+
+#[derive(Debug, Clone)]
 pub struct AppConfig {
     pub server_host: String,
     pub server_port: u16,
@@ -32,6 +43,7 @@ pub struct AppConfig {
     pub audit_log_retention_days: i64,
     pub features: FeatureFlags,
     pub crawler: CrawlerConfig,
+    pub meili: MeiliConfig,
 }
 
 impl AppConfig {
@@ -51,6 +63,7 @@ impl AppConfig {
                 trending_enabled: parse_env_bool("FEATURE_TRENDING_ENABLED", true)?,
                 file_tree_enabled: parse_env_bool("FEATURE_FILE_TREE_ENABLED", true)?,
                 audit_enabled: parse_env_bool("FEATURE_SEARCH_AUDIT_ENABLED", true)?,
+                meili_enabled: parse_env_bool("FEATURE_MEILI_ENABLED", false)?,
             },
             crawler: CrawlerConfig {
                 enabled: parse_env_bool("CRAWLER_ENABLED", true)?,
@@ -68,6 +81,14 @@ impl AppConfig {
                 node_queue_capacity: parse_env("CRAWLER_NODE_QUEUE_CAPACITY", 100_000usize)?,
                 hash_queue_capacity: parse_env("CRAWLER_HASH_QUEUE_CAPACITY", 10_000usize)?,
             },
+            meili: MeiliConfig {
+                url: env_or("MEILI_URL", "http://127.0.0.1:7700"),
+                api_key: optional_env("MEILI_API_KEY"),
+                index: env_or("MEILI_INDEX", "torrents"),
+                bootstrap_enabled: parse_env_bool("MEILI_BOOTSTRAP_ENABLED", true)?,
+                bootstrap_batch_size: parse_env("MEILI_BOOTSTRAP_BATCH_SIZE", 2_000u32)?,
+                query_timeout_ms: parse_env("MEILI_QUERY_TIMEOUT_MS", 1_200u64)?,
+            },
         })
     }
 }
@@ -82,6 +103,20 @@ fn required_env(key: &str) -> Result<String> {
 
 fn env_or(key: &str, default: &str) -> String {
     env::var(key).unwrap_or_else(|_| default.to_owned())
+}
+
+fn optional_env(key: &str) -> Option<String> {
+    match env::var(key) {
+        Ok(value) => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        }
+        Err(_) => None,
+    }
 }
 
 fn parse_env<T>(key: &str, default: T) -> Result<T>

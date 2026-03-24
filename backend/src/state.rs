@@ -1,4 +1,4 @@
-use crate::config::AppConfig;
+use crate::{config::AppConfig, search::client::MeiliSearchClient};
 use serde::Serialize;
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -24,25 +24,50 @@ impl CrawlerStatus {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MeiliStatus {
+    Disabled,
+    Starting,
+    Syncing,
+    Ready,
+    Failed,
+}
+
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
     pub config: Arc<AppConfig>,
+    meili_client: Option<Arc<MeiliSearchClient>>,
     crawler_status: Arc<RwLock<CrawlerStatus>>,
+    meili_status: Arc<RwLock<MeiliStatus>>,
 }
 
 impl AppState {
-    pub fn new(pool: PgPool, config: Arc<AppConfig>) -> Self {
+    pub fn new(
+        pool: PgPool,
+        config: Arc<AppConfig>,
+        meili_client: Option<Arc<MeiliSearchClient>>,
+    ) -> Self {
         let initial_status = if config.crawler.enabled {
             CrawlerStatus::Starting
         } else {
             CrawlerStatus::Disabled
         };
+        let initial_meili_status = if !config.features.meili_enabled {
+            MeiliStatus::Disabled
+        } else if meili_client.is_some() {
+            MeiliStatus::Starting
+        } else {
+            MeiliStatus::Failed
+        };
 
         Self {
             pool,
             config,
+            meili_client,
             crawler_status: Arc::new(RwLock::new(initial_status)),
+            meili_status: Arc::new(RwLock::new(initial_meili_status)),
         }
     }
 
@@ -53,5 +78,14 @@ impl AppState {
 
     pub async fn crawler_status(&self) -> CrawlerStatus {
         *self.crawler_status.read().await
+    }
+
+    pub fn meili_client(&self) -> Option<Arc<MeiliSearchClient>> {
+        self.meili_client.clone()
+    }
+
+    pub async fn set_meili_status(&self, status: MeiliStatus) {
+        let mut guard = self.meili_status.write().await;
+        *guard = status;
     }
 }

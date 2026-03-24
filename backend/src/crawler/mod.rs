@@ -37,7 +37,7 @@ pub async fn spawn(state: AppState) -> Result<()> {
     let ingest_state = state.clone();
     tokio::spawn(async move {
         while let Some(torrent) = rx.recv().await {
-            if let Err(err) = ingest::ingest_torrent(&ingest_state.pool, torrent).await {
+            if let Err(err) = ingest::ingest_torrent(&ingest_state, torrent).await {
                 error!(error = ?err, "failed to ingest torrent");
             }
         }

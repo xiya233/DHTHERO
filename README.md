@@ -27,6 +27,15 @@ cargo run
 
 Server starts on `http://localhost:8080` by default and runs SQL migrations automatically.
 
+Optional Meilisearch integration (MVP):
+
+- Start local Meilisearch via `docker compose up -d meilisearch`
+- Enable in `backend/.env`:
+  - `FEATURE_MEILI_ENABLED=true`
+  - `MEILI_URL=http://127.0.0.1:7700`
+- `/api/v1/search` will use Meilisearch for `sort=relevance|latest`
+- On Meilisearch timeout/failure, backend automatically falls back to PostgreSQL search
+
 ## Frontend
 
 ```bash

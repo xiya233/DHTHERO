@@ -10,6 +10,7 @@ use crate::{
     },
     domain::category::{Category, all_category_meta},
     error::ApiError,
+    search,
     state::AppState,
 };
 use axum::{
@@ -170,24 +171,55 @@ pub async fn search(
         offset: pagination.offset,
     };
 
-    let (rows, total) = match repo::search_torrents(&state.pool, &params).await {
-        Ok(value) => value,
+    let (rows, total) = match search::query::search_torrents(&state, &params).await {
+        Ok(Some(value)) => value,
+        Ok(None) => match repo::search_torrents(&state.pool, &params).await {
+            Ok(value) => value,
+            Err(err) => {
+                status_code = 500;
+                write_search_audit(
+                    &state,
+                    &headers,
+                    Some(&connect_info),
+                    &trimmed_query,
+                    parsed_category,
+                    parsed_sort,
+                    pagination,
+                    result_count,
+                    start.elapsed().as_millis() as i64,
+                    status_code,
+                )
+                .await;
+                return Err(ApiError::from(err));
+            }
+        },
         Err(err) => {
-            status_code = 500;
-            write_search_audit(
-                &state,
-                &headers,
-                Some(&connect_info),
-                &trimmed_query,
-                parsed_category,
-                parsed_sort,
-                pagination,
-                result_count,
-                start.elapsed().as_millis() as i64,
-                status_code,
-            )
-            .await;
-            return Err(ApiError::from(err));
+            warn!(
+                error = ?err,
+                sort = parsed_sort.as_str(),
+                "meili search failed, falling back to postgres"
+            );
+
+            match repo::search_torrents(&state.pool, &params).await {
+                Ok(value) => value,
+                Err(err) => {
+                    status_code = 500;
+                    write_search_audit(
+                        &state,
+                        &headers,
+                        Some(&connect_info),
+                        &trimmed_query,
+                        parsed_category,
+                        parsed_sort,
+                        pagination,
+                        result_count,
+                        start.elapsed().as_millis() as i64,
+                        status_code,
+                    )
+                    .await;
+                    return Err(ApiError::from(err));
+                }
+            }
         }
     };
 
@@ -529,8 +561,17 @@ mod tests {
         ];
 
         let tree = build_file_tree(files);
-        assert!(tree.iter().any(|entry| entry.is_dir && entry.path == "movie"));
-        assert!(tree.iter().any(|entry| entry.is_dir && entry.path == "movie/subs"));
-        assert!(tree.iter().any(|entry| !entry.is_dir && entry.path == "movie/part1.mkv"));
+        assert!(
+            tree.iter()
+                .any(|entry| entry.is_dir && entry.path == "movie")
+        );
+        assert!(
+            tree.iter()
+                .any(|entry| entry.is_dir && entry.path == "movie/subs")
+        );
+        assert!(
+            tree.iter()
+                .any(|entry| !entry.is_dir && entry.path == "movie/part1.mkv")
+        );
     }
 }

@@ -1,11 +1,11 @@
-use crate::domain::category::Category;
+use crate::{domain::category::Category, state::AppState};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use dht_crawler::TorrentInfo;
-use sqlx::PgPool;
 use std::net::SocketAddr;
+use tracing::warn;
 
-pub async fn ingest_torrent(pool: &PgPool, torrent: TorrentInfo) -> Result<()> {
+pub async fn ingest_torrent(state: &AppState, torrent: TorrentInfo) -> Result<()> {
     if !is_valid_info_hash(&torrent.info_hash) {
         return Ok(());
     }
@@ -24,7 +24,7 @@ pub async fn ingest_torrent(pool: &PgPool, torrent: TorrentInfo) -> Result<()> {
     let peer_ip: Option<String> = peer.map(|value| value.ip().to_string());
     let peer_port: Option<i32> = peer.map(|value| i32::from(value.port()));
 
-    let mut tx = pool.begin().await?;
+    let mut tx = state.pool.begin().await?;
 
     sqlx::query(
         r#"
@@ -146,6 +146,18 @@ pub async fn ingest_torrent(pool: &PgPool, torrent: TorrentInfo) -> Result<()> {
     }
 
     tx.commit().await?;
+
+    if state.config.features.meili_enabled {
+        let sync_state = state.clone();
+        let sync_hash = info_hash.clone();
+        tokio::spawn(async move {
+            if let Err(err) =
+                crate::search::sync::sync_single_document(&sync_state, &sync_hash).await
+            {
+                warn!(error = ?err, info_hash = %sync_hash, "failed to sync torrent into meili");
+            }
+        });
+    }
 
     Ok(())
 }
