@@ -1,4 +1,5 @@
 use crate::{config::AppConfig, search::client::MeiliSearchClient};
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -34,6 +35,79 @@ pub enum MeiliStatus {
     Failed,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct AdminDashboardNow {
+    pub crawler_status: String,
+    pub info_hash_discovered_total: f64,
+    pub metadata_fetch_success_total: f64,
+    pub metadata_fetch_fail_total: f64,
+    pub metadata_queue_size: f64,
+    pub node_queue_size: f64,
+    pub metadata_worker_pressure: f64,
+    pub udp_packets_received_total: f64,
+    pub udp_packets_sent_total: f64,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AdminDashboardSeriesPoint {
+    pub timestamp: DateTime<Utc>,
+    pub info_hash_discovered_total: f64,
+    pub metadata_fetch_success_total: f64,
+    pub metadata_fetch_fail_total: f64,
+    pub metadata_queue_size: f64,
+    pub node_queue_size: f64,
+    pub metadata_worker_pressure: f64,
+    pub udp_packets_received_rate: f64,
+    pub udp_packets_sent_rate: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AdminDashboardWindow {
+    pub sample_interval_secs: u64,
+    pub points: usize,
+    pub horizon_secs: u64,
+    pub prometheus_enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AdminDashboardSnapshot {
+    pub now: AdminDashboardNow,
+    pub series: Vec<AdminDashboardSeriesPoint>,
+    pub window: AdminDashboardWindow,
+}
+
+impl AdminDashboardSnapshot {
+    pub fn empty(
+        crawler_status: &str,
+        sample_interval_secs: u64,
+        history_points: usize,
+        prometheus_enabled: bool,
+    ) -> Self {
+        Self {
+            now: AdminDashboardNow {
+                crawler_status: crawler_status.to_string(),
+                info_hash_discovered_total: 0.0,
+                metadata_fetch_success_total: 0.0,
+                metadata_fetch_fail_total: 0.0,
+                metadata_queue_size: 0.0,
+                node_queue_size: 0.0,
+                metadata_worker_pressure: 0.0,
+                udp_packets_received_total: 0.0,
+                udp_packets_sent_total: 0.0,
+                updated_at: Utc::now(),
+            },
+            series: Vec::new(),
+            window: AdminDashboardWindow {
+                sample_interval_secs,
+                points: history_points,
+                horizon_secs: sample_interval_secs.saturating_mul(history_points as u64),
+                prometheus_enabled,
+            },
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
@@ -42,6 +116,7 @@ pub struct AppState {
     meili_sync_tx: Option<mpsc::Sender<String>>,
     crawler_status: Arc<RwLock<CrawlerStatus>>,
     meili_status: Arc<RwLock<MeiliStatus>>,
+    admin_dashboard: Arc<RwLock<AdminDashboardSnapshot>>,
 }
 
 impl AppState {
@@ -63,6 +138,14 @@ impl AppState {
         } else {
             MeiliStatus::Failed
         };
+        let metrics_sample_interval_secs = config.admin.metrics_sample_interval_secs.max(1);
+        let metrics_history_points = config.admin.metrics_history_points.max(1);
+        let initial_dashboard = AdminDashboardSnapshot::empty(
+            initial_status.as_str(),
+            metrics_sample_interval_secs,
+            metrics_history_points,
+            false,
+        );
 
         Self {
             pool,
@@ -71,6 +154,7 @@ impl AppState {
             meili_sync_tx,
             crawler_status: Arc::new(RwLock::new(initial_status)),
             meili_status: Arc::new(RwLock::new(initial_meili_status)),
+            admin_dashboard: Arc::new(RwLock::new(initial_dashboard)),
         }
     }
 
@@ -98,5 +182,14 @@ impl AppState {
         };
 
         tx.try_send(info_hash).is_ok()
+    }
+
+    pub async fn set_admin_dashboard(&self, snapshot: AdminDashboardSnapshot) {
+        let mut guard = self.admin_dashboard.write().await;
+        *guard = snapshot;
+    }
+
+    pub async fn admin_dashboard(&self) -> AdminDashboardSnapshot {
+        self.admin_dashboard.read().await.clone()
     }
 }

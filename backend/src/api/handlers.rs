@@ -31,6 +31,14 @@ pub async fn healthz() -> Json<HealthResponse> {
     })
 }
 
+pub async fn admin_dashboard(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<crate::state::AdminDashboardSnapshot>, ApiError> {
+    ensure_admin_authorized(&state, &headers)?;
+    Ok(Json(state.admin_dashboard().await))
+}
+
 pub async fn features(State(state): State<AppState>) -> Json<FeaturesResponse> {
     Json(FeaturesResponse {
         search_enabled: state.config.features.search_enabled,
@@ -380,6 +388,23 @@ fn ensure_feature(enabled: bool, key: &'static str) -> Result<(), ApiError> {
     } else {
         Err(ApiError::feature_disabled(key))
     }
+}
+
+fn ensure_admin_authorized(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError> {
+    let Some(expected_password) = state.config.admin.dashboard_password.as_deref() else {
+        return Err(ApiError::feature_disabled("admin_dashboard"));
+    };
+
+    let provided = header_value(headers, "x-admin-password")
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| ApiError::unauthorized("missing x-admin-password header"))?;
+
+    if provided != expected_password {
+        return Err(ApiError::unauthorized("invalid admin password"));
+    }
+
+    Ok(())
 }
 
 fn parse_category(value: Option<&str>) -> Result<Option<i16>, ApiError> {

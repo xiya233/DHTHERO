@@ -1,3 +1,4 @@
+mod admin;
 mod api;
 mod config;
 mod crawler;
@@ -29,6 +30,7 @@ async fn main() -> anyhow::Result<()> {
     init_tracing();
 
     let config = AppConfig::from_env()?;
+    let prometheus_handle = admin::init_prometheus_exporter(&config);
 
     let pool = PgPoolOptions::new()
         .max_connections(config.database_max_connections)
@@ -62,6 +64,7 @@ async fn main() -> anyhow::Result<()> {
         meili_client,
         meili_sync_tx,
     );
+    admin::spawn_dashboard_sampler(state.clone(), prometheus_handle);
 
     if config.features.meili_enabled {
         if state.meili_client().is_some() {

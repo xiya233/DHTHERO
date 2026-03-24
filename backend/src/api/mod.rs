@@ -20,6 +20,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/site/stats", get(handlers::site_stats))
         .route("/api/v1/categories", get(handlers::categories))
         .route("/api/v1/search", get(handlers::search))
+        .route("/api/v1/admin/dashboard", get(handlers::admin_dashboard))
         .route("/api/v1/latest", get(handlers::latest))
         .route("/api/v1/trending", get(handlers::trending))
         .route(

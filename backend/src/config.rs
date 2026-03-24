@@ -23,6 +23,8 @@ pub struct CrawlerConfig {
     pub hash_queue_capacity: usize,
     pub ingest_worker_count: usize,
     pub ingest_queue_capacity: usize,
+    pub prometheus_enabled: bool,
+    pub prometheus_listen_addr: String,
 }
 
 #[derive(Debug, Clone)]
@@ -39,6 +41,13 @@ pub struct MeiliConfig {
 }
 
 #[derive(Debug, Clone)]
+pub struct AdminConfig {
+    pub dashboard_password: Option<String>,
+    pub metrics_sample_interval_secs: u64,
+    pub metrics_history_points: usize,
+}
+
+#[derive(Debug, Clone)]
 pub struct AppConfig {
     pub server_host: String,
     pub server_port: u16,
@@ -49,6 +58,7 @@ pub struct AppConfig {
     pub features: FeatureFlags,
     pub crawler: CrawlerConfig,
     pub meili: MeiliConfig,
+    pub admin: AdminConfig,
 }
 
 impl AppConfig {
@@ -87,6 +97,8 @@ impl AppConfig {
                 hash_queue_capacity: parse_env("CRAWLER_HASH_QUEUE_CAPACITY", 10_000usize)?,
                 ingest_worker_count: parse_env("CRAWLER_INGEST_WORKER_COUNT", 0usize)?,
                 ingest_queue_capacity: parse_env("CRAWLER_INGEST_QUEUE_CAPACITY", 50_000usize)?,
+                prometheus_enabled: parse_env_bool("CRAWLER_PROMETHEUS_ENABLED", true)?,
+                prometheus_listen_addr: env_or("CRAWLER_PROMETHEUS_LISTEN_ADDR", "0.0.0.0:9000"),
             },
             meili: MeiliConfig {
                 url: env_or("MEILI_URL", "http://127.0.0.1:7700"),
@@ -98,6 +110,14 @@ impl AppConfig {
                 sync_batch_size: parse_env("MEILI_SYNC_BATCH_SIZE", 256usize)?,
                 sync_flush_interval_ms: parse_env("MEILI_SYNC_FLUSH_INTERVAL_MS", 250u64)?,
                 sync_queue_capacity: parse_env("MEILI_SYNC_QUEUE_CAPACITY", 20_000usize)?,
+            },
+            admin: AdminConfig {
+                dashboard_password: optional_env("ADMIN_DASHBOARD_PASSWORD"),
+                metrics_sample_interval_secs: parse_env(
+                    "ADMIN_METRICS_SAMPLE_INTERVAL_SECS",
+                    5u64,
+                )?,
+                metrics_history_points: parse_env("ADMIN_METRICS_HISTORY_POINTS", 720usize)?,
             },
         })
     }

@@ -48,6 +48,18 @@ Crawler ingest throughput tuning:
 - Ingest now uses bounded queue + concurrent workers (non-blocking drop-on-full) and only writes
   `torrent_files` on first-seen info_hash to reduce write amplification
 
+Admin dashboard (crawler metrics):
+
+- Backend env:
+  - `ADMIN_DASHBOARD_PASSWORD=your_password`
+  - `CRAWLER_PROMETHEUS_ENABLED=true`
+  - `CRAWLER_PROMETHEUS_LISTEN_ADDR=0.0.0.0:9000`
+- Frontend env:
+  - `ADMIN_DASHBOARD_PASSWORD=your_password`
+- Visit:
+  - `http://localhost:3000/admin/login`
+  - Prometheus metrics endpoint: `http://localhost:9000/metrics`
+
 ## Frontend
 
 ```bash
