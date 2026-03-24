@@ -35,13 +35,13 @@ export function TorrentCard({ item }: { item: TorrentListItem }) {
       <footer className="mt-4 flex flex-wrap gap-3 text-sm">
         <a
           href={item.magnet_link}
-          className="border-2 border-ink bg-accent-yellow px-3 py-1 font-bold uppercase tracking-wide hover:bg-ink hover:text-paper"
+          className="bauhaus-shadow-sm bauhaus-press inline-flex items-center justify-center border-2 border-ink bg-accent-yellow px-3 py-1 font-bold uppercase tracking-wide transition-all hover:bg-ink hover:text-paper"
         >
           Magnet
         </a>
         <Link
           href={`/torrent/${item.info_hash}`}
-          className="border-2 border-ink bg-paper px-3 py-1 font-bold uppercase tracking-wide hover:bg-accent-blue hover:text-paper"
+          className="bauhaus-shadow-sm bauhaus-press inline-flex items-center justify-center border-2 border-ink bg-paper px-3 py-1 font-bold uppercase tracking-wide transition-all hover:bg-accent-blue hover:text-paper"
         >
           Details
         </Link>

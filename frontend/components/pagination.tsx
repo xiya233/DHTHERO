@@ -35,7 +35,7 @@ export function Pagination({ pathname, page, pageSize, total, query }: Props) {
       <Link
         href={buildHref(pathname, query, previousPage, pageSize)}
         aria-disabled={page <= 1}
-        className="border-2 border-ink px-3 py-1 text-sm font-bold uppercase tracking-wide hover:bg-accent-yellow aria-disabled:pointer-events-none aria-disabled:opacity-50"
+        className="bauhaus-shadow-sm bauhaus-press inline-flex items-center justify-center border-2 border-ink bg-paper px-3 py-1 text-sm font-bold uppercase tracking-wide transition-all hover:bg-accent-yellow aria-disabled:pointer-events-none aria-disabled:opacity-50"
       >
         Prev
       </Link>
@@ -45,7 +45,7 @@ export function Pagination({ pathname, page, pageSize, total, query }: Props) {
       <Link
         href={buildHref(pathname, query, nextPage, pageSize)}
         aria-disabled={page >= totalPages}
-        className="border-2 border-ink px-3 py-1 text-sm font-bold uppercase tracking-wide hover:bg-accent-yellow aria-disabled:pointer-events-none aria-disabled:opacity-50"
+        className="bauhaus-shadow-sm bauhaus-press inline-flex items-center justify-center border-2 border-ink bg-paper px-3 py-1 text-sm font-bold uppercase tracking-wide transition-all hover:bg-accent-yellow aria-disabled:pointer-events-none aria-disabled:opacity-50"
       >
         Next
       </Link>

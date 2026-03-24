@@ -80,7 +80,7 @@ export default async function TrendingPage({ searchParams }: TrendingPageProps) 
             ))}
           </select>
 
-          <button className="border-2 border-ink bg-accent-yellow px-4 py-2 font-headline text-sm font-black uppercase hover:bg-ink hover:text-paper">
+          <button className="bauhaus-shadow-sm bauhaus-press border-2 border-ink bg-accent-yellow px-4 py-2 font-headline text-sm font-black uppercase transition-all hover:bg-ink hover:text-paper">
             Apply
           </button>
         </form>
