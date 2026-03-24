@@ -56,7 +56,7 @@ export default async function RootLayout({
                 {features.trending_enabled && (
                   <Link
                     href="/trending"
-                    className="transition-colors duration-75 hover:bg-accent-yellow hover:text-ink"
+                    className="text-accent-yellow underline decoration-4 underline-offset-8 transition-colors duration-75 hover:bg-accent-yellow hover:text-ink"
                   >
                     Trending
                   </Link>
