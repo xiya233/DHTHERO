@@ -31,6 +31,9 @@ pub struct MeiliConfig {
     pub bootstrap_enabled: bool,
     pub bootstrap_batch_size: u32,
     pub query_timeout_ms: u64,
+    pub sync_batch_size: usize,
+    pub sync_flush_interval_ms: u64,
+    pub sync_queue_capacity: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -88,6 +91,9 @@ impl AppConfig {
                 bootstrap_enabled: parse_env_bool("MEILI_BOOTSTRAP_ENABLED", true)?,
                 bootstrap_batch_size: parse_env("MEILI_BOOTSTRAP_BATCH_SIZE", 2_000u32)?,
                 query_timeout_ms: parse_env("MEILI_QUERY_TIMEOUT_MS", 1_200u64)?,
+                sync_batch_size: parse_env("MEILI_SYNC_BATCH_SIZE", 256usize)?,
+                sync_flush_interval_ms: parse_env("MEILI_SYNC_FLUSH_INTERVAL_MS", 250u64)?,
+                sync_queue_capacity: parse_env("MEILI_SYNC_QUEUE_CAPACITY", 20_000usize)?,
             },
         })
     }

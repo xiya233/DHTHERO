@@ -402,29 +402,6 @@ pub async fn fetch_torrent_detail(
     .await
 }
 
-pub async fn fetch_meili_doc_by_info_hash(
-    pool: &PgPool,
-    info_hash: &str,
-) -> Result<Option<MeiliDocRow>, sqlx::Error> {
-    sqlx::query_as::<_, MeiliDocRow>(
-        r#"
-        SELECT
-            info_hash,
-            name,
-            category,
-            total_size,
-            file_count,
-            first_seen_at,
-            last_seen_at
-        FROM torrents
-        WHERE info_hash = $1
-        "#,
-    )
-    .bind(info_hash)
-    .fetch_optional(pool)
-    .await
-}
-
 pub async fn fetch_meili_docs_batch(
     pool: &PgPool,
     limit: i64,
@@ -448,6 +425,34 @@ pub async fn fetch_meili_docs_batch(
     )
     .bind(limit.max(1))
     .bind(offset.max(0))
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn fetch_meili_docs_by_info_hashes(
+    pool: &PgPool,
+    info_hashes: &[String],
+) -> Result<Vec<MeiliDocRow>, sqlx::Error> {
+    if info_hashes.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    sqlx::query_as::<_, MeiliDocRow>(
+        r#"
+        SELECT
+            t.info_hash,
+            t.name,
+            t.category,
+            t.total_size,
+            t.file_count,
+            t.first_seen_at,
+            t.last_seen_at
+        FROM unnest($1::text[]) WITH ORDINALITY AS input(info_hash, ord)
+        JOIN torrents t ON t.info_hash::text = input.info_hash
+        ORDER BY input.ord ASC
+        "#,
+    )
+    .bind(info_hashes)
     .fetch_all(pool)
     .await
 }

@@ -33,6 +33,10 @@ Optional Meilisearch integration (MVP):
 - Enable in `backend/.env`:
   - `FEATURE_MEILI_ENABLED=true`
   - `MEILI_URL=http://127.0.0.1:7700`
+- Incremental sync is batched by queue (defaults):
+  - `MEILI_SYNC_BATCH_SIZE=256`
+  - `MEILI_SYNC_FLUSH_INTERVAL_MS=250`
+  - `MEILI_SYNC_QUEUE_CAPACITY=20000`
 - `/api/v1/search` will use Meilisearch for `sort=relevance|latest`
 - On Meilisearch timeout/failure, backend automatically falls back to PostgreSQL search
 

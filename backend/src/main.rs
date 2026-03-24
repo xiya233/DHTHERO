@@ -12,6 +12,7 @@ use axum::Router;
 use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::net::TcpListener;
+use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 use tracing_subscriber::{EnvFilter, fmt};
 
@@ -41,7 +42,26 @@ async fn main() -> anyhow::Result<()> {
         .context("failed to run sql migrations")?;
 
     let meili_client = init_meili_client(&config).await;
-    let state = AppState::new(pool.clone(), Arc::new(config.clone()), meili_client);
+    let meili_sync_tx = if config.features.meili_enabled && meili_client.is_some() {
+        let queue_capacity = config.meili.sync_queue_capacity.max(1);
+        let (tx, rx) = mpsc::channel::<String>(queue_capacity);
+        search::sync::spawn_incremental_worker(
+            pool.clone(),
+            Arc::new(config.clone()),
+            meili_client.clone(),
+            rx,
+        );
+        Some(tx)
+    } else {
+        None
+    };
+
+    let state = AppState::new(
+        pool.clone(),
+        Arc::new(config.clone()),
+        meili_client,
+        meili_sync_tx,
+    );
 
     if config.features.meili_enabled {
         if state.meili_client().is_some() {

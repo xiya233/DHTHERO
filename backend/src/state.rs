@@ -2,7 +2,7 @@ use crate::{config::AppConfig, search::client::MeiliSearchClient};
 use serde::Serialize;
 use sqlx::PgPool;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, mpsc};
 
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -39,6 +39,7 @@ pub struct AppState {
     pub pool: PgPool,
     pub config: Arc<AppConfig>,
     meili_client: Option<Arc<MeiliSearchClient>>,
+    meili_sync_tx: Option<mpsc::Sender<String>>,
     crawler_status: Arc<RwLock<CrawlerStatus>>,
     meili_status: Arc<RwLock<MeiliStatus>>,
 }
@@ -48,6 +49,7 @@ impl AppState {
         pool: PgPool,
         config: Arc<AppConfig>,
         meili_client: Option<Arc<MeiliSearchClient>>,
+        meili_sync_tx: Option<mpsc::Sender<String>>,
     ) -> Self {
         let initial_status = if config.crawler.enabled {
             CrawlerStatus::Starting
@@ -66,6 +68,7 @@ impl AppState {
             pool,
             config,
             meili_client,
+            meili_sync_tx,
             crawler_status: Arc::new(RwLock::new(initial_status)),
             meili_status: Arc::new(RwLock::new(initial_meili_status)),
         }
@@ -87,5 +90,13 @@ impl AppState {
     pub async fn set_meili_status(&self, status: MeiliStatus) {
         let mut guard = self.meili_status.write().await;
         *guard = status;
+    }
+
+    pub fn enqueue_meili_sync(&self, info_hash: String) -> bool {
+        let Some(tx) = &self.meili_sync_tx else {
+            return false;
+        };
+
+        tx.try_send(info_hash).is_ok()
     }
 }

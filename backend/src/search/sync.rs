@@ -1,29 +1,80 @@
-use anyhow::Result;
-use std::time::Duration;
-use tokio::time::sleep;
+use std::{
+    collections::HashSet,
+    sync::Arc,
+    time::{Duration, Instant},
+};
+use tokio::{
+    sync::mpsc,
+    time::{MissedTickBehavior, interval, sleep},
+};
 use tracing::{info, warn};
 
 use crate::{
+    config::AppConfig,
     db::{models::MeiliDocRow, repo},
     state::{AppState, MeiliStatus},
 };
 
-use super::client::MeiliTorrentDoc;
+use super::client::{MeiliSearchClient, MeiliTorrentDoc};
 
-pub async fn sync_single_document(state: &AppState, info_hash: &str) -> Result<()> {
-    if !state.config.features.meili_enabled {
-        return Ok(());
+pub fn spawn_incremental_worker(
+    pool: sqlx::PgPool,
+    config: Arc<AppConfig>,
+    client: Option<Arc<MeiliSearchClient>>,
+    mut rx: mpsc::Receiver<String>,
+) {
+    if !config.features.meili_enabled {
+        return;
     }
 
-    let Some(client) = state.meili_client() else {
-        return Ok(());
+    let Some(client) = client else {
+        return;
     };
 
-    let Some(row) = repo::fetch_meili_doc_by_info_hash(&state.pool, info_hash).await? else {
-        return Ok(());
-    };
+    tokio::spawn(async move {
+        let max_batch = config.meili.sync_batch_size.max(1);
+        let flush_every = Duration::from_millis(config.meili.sync_flush_interval_ms.max(50));
+        let mut ticker = interval(flush_every);
+        ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
-    client.upsert_documents(&[to_meili_doc(row)]).await
+        let mut pending = Vec::<String>::with_capacity(max_batch);
+        let mut dedup = HashSet::<String>::with_capacity(max_batch.saturating_mul(2));
+        let mut dropped = 0u64;
+        let mut last_report = Instant::now();
+        let report_every = Duration::from_secs(10);
+
+        loop {
+            tokio::select! {
+                maybe_hash = rx.recv() => {
+                    let Some(info_hash) = maybe_hash else {
+                        break;
+                    };
+                    if dedup.insert(info_hash.clone()) {
+                        pending.push(info_hash);
+                    }
+
+                    if pending.len() >= max_batch {
+                        flush_pending(&pool, &client, &mut pending, &mut dedup).await;
+                    }
+                }
+                _ = ticker.tick() => {
+                    if !pending.is_empty() {
+                        flush_pending(&pool, &client, &mut pending, &mut dedup).await;
+                    }
+
+                    if dropped > 0 && last_report.elapsed() >= report_every {
+                        warn!(dropped, "meili sync queue had dropped items (backpressure)");
+                        dropped = 0;
+                        last_report = Instant::now();
+                    }
+                }
+            }
+        }
+
+        if !pending.is_empty() {
+            flush_pending(&pool, &client, &mut pending, &mut dedup).await;
+        }
+    });
 }
 
 pub fn spawn_bootstrap_job(state: AppState) {
@@ -81,6 +132,21 @@ pub fn spawn_bootstrap_job(state: AppState) {
     });
 }
 
+pub fn try_enqueue_incremental(state: &AppState, info_hash: String) {
+    if !state.config.features.meili_enabled {
+        return;
+    }
+
+    if state.enqueue_meili_sync(info_hash.clone()) {
+        return;
+    }
+
+    warn!(
+        info_hash = %info_hash,
+        "meili sync queue is full or unavailable, skipping incremental sync"
+    );
+}
+
 pub fn to_meili_doc(row: MeiliDocRow) -> MeiliTorrentDoc {
     MeiliTorrentDoc {
         info_hash: row.info_hash,
@@ -96,4 +162,53 @@ pub fn to_meili_doc(row: MeiliDocRow) -> MeiliTorrentDoc {
 fn next_backoff(current: Duration, max_backoff: Duration) -> Duration {
     let doubled_secs = current.as_secs().saturating_mul(2).max(1);
     Duration::from_secs(doubled_secs.min(max_backoff.as_secs()))
+}
+
+async fn flush_pending(
+    pool: &sqlx::PgPool,
+    client: &MeiliSearchClient,
+    pending: &mut Vec<String>,
+    dedup: &mut HashSet<String>,
+) {
+    if pending.is_empty() {
+        return;
+    }
+
+    let current_batch = std::mem::take(pending);
+    dedup.clear();
+
+    let mut backoff = Duration::from_millis(200);
+    let max_backoff = Duration::from_secs(5);
+
+    loop {
+        match repo::fetch_meili_docs_by_info_hashes(pool, &current_batch).await {
+            Ok(rows) => {
+                let docs: Vec<MeiliTorrentDoc> = rows.into_iter().map(to_meili_doc).collect();
+                if docs.is_empty() {
+                    return;
+                }
+
+                match client.upsert_documents(&docs).await {
+                    Ok(_) => return,
+                    Err(err) => {
+                        warn!(
+                            error = ?err,
+                            count = docs.len(),
+                            "failed to upsert incremental meili batch, retrying"
+                        );
+                    }
+                }
+            }
+            Err(err) => {
+                warn!(
+                    error = ?err,
+                    count = current_batch.len(),
+                    "failed to fetch incremental meili batch from postgres, retrying"
+                );
+            }
+        }
+
+        sleep(backoff).await;
+        backoff = next_backoff(backoff, max_backoff);
+    }
 }

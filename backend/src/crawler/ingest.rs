@@ -3,7 +3,6 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use dht_crawler::TorrentInfo;
 use std::net::SocketAddr;
-use tracing::warn;
 
 pub async fn ingest_torrent(state: &AppState, torrent: TorrentInfo) -> Result<()> {
     if !is_valid_info_hash(&torrent.info_hash) {
@@ -148,15 +147,7 @@ pub async fn ingest_torrent(state: &AppState, torrent: TorrentInfo) -> Result<()
     tx.commit().await?;
 
     if state.config.features.meili_enabled {
-        let sync_state = state.clone();
-        let sync_hash = info_hash.clone();
-        tokio::spawn(async move {
-            if let Err(err) =
-                crate::search::sync::sync_single_document(&sync_state, &sync_hash).await
-            {
-                warn!(error = ?err, info_hash = %sync_hash, "failed to sync torrent into meili");
-            }
-        });
+        crate::search::sync::try_enqueue_incremental(state, info_hash.clone());
     }
 
     Ok(())
