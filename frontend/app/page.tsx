@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { BauhausIcon } from "@/components/bauhaus-icon";
 import { getCategories, getFeatures, getSiteStats } from "@/lib/api";
-import { formatNumber } from "@/lib/format";
+import { formatCompactNumber, formatNumber } from "@/lib/format";
 
 const FIXED_CATEGORY_ORDER = [
   { key: "all", label: "All", icon: "all" },
@@ -82,20 +82,23 @@ export default async function HomePage() {
               ? "/latest"
               : `/latest?category=${encodeURIComponent(item.key)}`;
           const isAll = item.key === "all";
+          const compactCount = item.count > 0 ? formatCompactNumber(item.count) : null;
+          const fullCountLabel = item.count > 0 ? `${item.label} (${formatNumber(item.count)})` : item.label;
           return (
             <Link
               key={item.key}
               href={href}
-              className={`bauhaus-shadow-sm bauhaus-press inline-flex items-center gap-2 border-2 border-ink px-6 py-2 font-headline text-sm font-bold uppercase tracking-wider transition-all ${
+              title={fullCountLabel}
+              className={`bauhaus-shadow-sm bauhaus-press inline-flex h-12 w-[168px] items-center justify-center gap-2 overflow-hidden whitespace-nowrap border-2 border-ink px-3 py-2 font-headline text-sm font-bold uppercase tracking-wider transition-all ${
                 isAll
                   ? "bg-ink text-paper"
                   : "bg-white hover:bg-accent-blue hover:text-paper"
               }`}
             >
               <BauhausIcon name={item.icon} className="size-4 shrink-0" />
-              <span>
+              <span className="min-w-0 truncate">
                 {item.label}
-                {item.count > 0 ? ` (${formatNumber(item.count)})` : ""}
+                {compactCount ? <span className="tabular-nums"> ({compactCount})</span> : null}
               </span>
             </Link>
           );
