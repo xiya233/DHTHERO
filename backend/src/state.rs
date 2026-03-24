@@ -2,7 +2,7 @@ use crate::{config::AppConfig, search::client::MeiliSearchClient};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::PgPool;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 use tokio::sync::{RwLock, mpsc};
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -41,25 +41,51 @@ pub struct AdminDashboardNow {
     pub info_hash_discovered_total: f64,
     pub metadata_fetch_success_total: f64,
     pub metadata_fetch_fail_total: f64,
+    pub metadata_success_rate: f64,
     pub metadata_queue_size: f64,
     pub node_queue_size: f64,
     pub metadata_worker_pressure: f64,
     pub udp_packets_received_total: f64,
     pub udp_packets_sent_total: f64,
+    pub udp_receive_drop_rate: f64,
     pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct AdminDashboardSeriesPoint {
+pub struct AdminDashboardPoint {
     pub timestamp: DateTime<Utc>,
-    pub info_hash_discovered_total: f64,
-    pub metadata_fetch_success_total: f64,
-    pub metadata_fetch_fail_total: f64,
-    pub metadata_queue_size: f64,
-    pub node_queue_size: f64,
-    pub metadata_worker_pressure: f64,
-    pub udp_packets_received_rate: f64,
-    pub udp_packets_sent_rate: f64,
+    pub value: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AdminDashboardSeries {
+    pub id: String,
+    pub label: String,
+    pub labels: BTreeMap<String, String>,
+    pub points: Vec<AdminDashboardPoint>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AdminChartRenderKind {
+    Lines,
+    Stacked,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AdminDashboardChart {
+    pub id: String,
+    pub title: String,
+    pub unit: String,
+    pub render: AdminChartRenderKind,
+    pub series: Vec<AdminDashboardSeries>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AdminDashboardTab {
+    pub id: String,
+    pub title: String,
+    pub charts: Vec<AdminDashboardChart>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -73,8 +99,8 @@ pub struct AdminDashboardWindow {
 #[derive(Debug, Clone, Serialize)]
 pub struct AdminDashboardSnapshot {
     pub now: AdminDashboardNow,
-    pub series: Vec<AdminDashboardSeriesPoint>,
     pub window: AdminDashboardWindow,
+    pub tabs: Vec<AdminDashboardTab>,
 }
 
 impl AdminDashboardSnapshot {
@@ -90,20 +116,22 @@ impl AdminDashboardSnapshot {
                 info_hash_discovered_total: 0.0,
                 metadata_fetch_success_total: 0.0,
                 metadata_fetch_fail_total: 0.0,
+                metadata_success_rate: 0.0,
                 metadata_queue_size: 0.0,
                 node_queue_size: 0.0,
                 metadata_worker_pressure: 0.0,
                 udp_packets_received_total: 0.0,
                 udp_packets_sent_total: 0.0,
+                udp_receive_drop_rate: 0.0,
                 updated_at: Utc::now(),
             },
-            series: Vec::new(),
             window: AdminDashboardWindow {
                 sample_interval_secs,
-                points: history_points,
+                points: 0,
                 horizon_secs: sample_interval_secs.saturating_mul(history_points as u64),
                 prometheus_enabled,
             },
+            tabs: Vec::new(),
         }
     }
 }
