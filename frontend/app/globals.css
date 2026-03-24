@@ -34,12 +34,22 @@ body {
   font-family: var(--font-inter), sans-serif;
 }
 
-.shadow-hard {
+.bauhaus-shadow {
   box-shadow: 6px 6px 0 0 var(--ink);
 }
 
-.shadow-hard-sm {
+.bauhaus-shadow-sm {
   box-shadow: 4px 4px 0 0 var(--ink);
+}
+
+.bauhaus-shadow-hover:hover {
+  box-shadow: 2px 2px 0 0 var(--ink);
+  transform: translate(2px, 2px);
+}
+
+.bauhaus-press:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 0 var(--ink);
 }
 
 .grid-paper {
