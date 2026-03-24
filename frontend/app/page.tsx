@@ -86,7 +86,7 @@ export default async function HomePage() {
             <Link
               key={item.key}
               href={href}
-              className={`bauhaus-shadow-sm border-2 border-ink px-6 py-2 font-headline text-sm font-bold uppercase tracking-wider transition-all active:translate-y-0.5 active:shadow-none ${
+              className={`bauhaus-shadow-sm bauhaus-press inline-flex border-2 border-ink px-6 py-2 font-headline text-sm font-bold uppercase tracking-wider transition-all ${
                 isAll
                   ? "bg-ink text-paper"
                   : "bg-white hover:bg-accent-blue hover:text-paper"
