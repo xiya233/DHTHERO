@@ -21,6 +21,8 @@ pub struct CrawlerConfig {
     pub max_metadata_worker_count: usize,
     pub node_queue_capacity: usize,
     pub hash_queue_capacity: usize,
+    pub ingest_worker_count: usize,
+    pub ingest_queue_capacity: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -83,6 +85,8 @@ impl AppConfig {
                 )?,
                 node_queue_capacity: parse_env("CRAWLER_NODE_QUEUE_CAPACITY", 100_000usize)?,
                 hash_queue_capacity: parse_env("CRAWLER_HASH_QUEUE_CAPACITY", 10_000usize)?,
+                ingest_worker_count: parse_env("CRAWLER_INGEST_WORKER_COUNT", 0usize)?,
+                ingest_queue_capacity: parse_env("CRAWLER_INGEST_QUEUE_CAPACITY", 50_000usize)?,
             },
             meili: MeiliConfig {
                 url: env_or("MEILI_URL", "http://127.0.0.1:7700"),

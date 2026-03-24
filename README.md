@@ -40,6 +40,14 @@ Optional Meilisearch integration (MVP):
 - `/api/v1/search` will use Meilisearch for `sort=relevance|latest`
 - On Meilisearch timeout/failure, backend automatically falls back to PostgreSQL search
 
+Crawler ingest throughput tuning:
+
+- `CRAWLER_INGEST_WORKER_COUNT=0` enables auto worker sizing:
+  - `clamp(2 * available_parallelism, 4, max(1, DATABASE_MAX_CONNECTIONS - 4))`
+- `CRAWLER_INGEST_QUEUE_CAPACITY=50000` controls backpressure queue depth before dropping
+- Ingest now uses bounded queue + concurrent workers (non-blocking drop-on-full) and only writes
+  `torrent_files` on first-seen info_hash to reduce write amplification
+
 ## Frontend
 
 ```bash
