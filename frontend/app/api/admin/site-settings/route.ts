@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { ADMIN_SESSION_COOKIE, getAdminPasswordFromEnv } from "@/lib/admin-auth";
+import { getSessionSecretFromEnv, verifySessionToken } from "@/lib/session-token";
 import { getPrivateSitePasswordFromEnv, isPrivateModeActiveFromEnv } from "@/lib/site-auth";
 
 const API_BASE_URL =
@@ -11,6 +12,7 @@ async function resolveAuthorizedHeaders(): Promise<
   { ok: true; headers: Record<string, string> } | { ok: false; response: NextResponse }
 > {
   const configuredPassword = getAdminPasswordFromEnv();
+  const sessionSecret = getSessionSecretFromEnv();
   if (!configuredPassword) {
     return {
       ok: false,
@@ -20,10 +22,20 @@ async function resolveAuthorizedHeaders(): Promise<
       ),
     };
   }
+  if (!sessionSecret) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { code: "SESSION_DISABLED", message: "session secret is not configured" },
+        { status: 503 },
+      ),
+    };
+  }
 
   const cookieStore = await cookies();
   const session = cookieStore.get(ADMIN_SESSION_COOKIE)?.value ?? "";
-  if (session !== configuredPassword) {
+  const authorized = await verifySessionToken(session, "admin", sessionSecret);
+  if (!authorized) {
     return {
       ok: false,
       response: NextResponse.json(

@@ -1,4 +1,5 @@
 export const SITE_SESSION_COOKIE = "dht_site_session";
+export const SITE_SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 
 export function getPrivateModeEnabledFromEnv(): boolean {
   return parseEnvBool(process.env.PRIVATE_MODE_ENABLED);

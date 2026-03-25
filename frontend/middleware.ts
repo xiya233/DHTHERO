@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin-auth";
 import {
+  getSessionSecretFromEnv,
+  verifySessionToken,
+} from "@/lib/session-token";
+import {
   SITE_SESSION_COOKIE,
-  getPrivateSitePasswordFromEnv,
   isPrivateModeActiveFromEnv,
 } from "@/lib/site-auth";
 
@@ -50,16 +53,28 @@ function sanitizeRedirectPath(pathname: string | null): string {
   return value;
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   if (isStaticAssetPath(pathname)) {
     return NextResponse.next();
   }
 
+  const sessionSecret = getSessionSecretFromEnv();
+
   if (isPrivateModeActiveFromEnv()) {
-    const sitePassword = getPrivateSitePasswordFromEnv();
+    if (!sessionSecret) {
+      if (isApiPath(pathname)) {
+        return NextResponse.json(
+          { code: "SESSION_DISABLED", message: "session secret is not configured" },
+          { status: 503 },
+        );
+      }
+
+      return new NextResponse("session secret is not configured", { status: 503 });
+    }
+
     const siteSession = request.cookies.get(SITE_SESSION_COOKIE)?.value ?? "";
-    const siteAuthorized = siteSession === sitePassword;
+    const siteAuthorized = await verifySessionToken(siteSession, "site", sessionSecret);
 
     if (pathname === "/login" && siteAuthorized) {
       const nextPath = sanitizeRedirectPath(request.nextUrl.searchParams.get("next"));
@@ -96,8 +111,20 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
+  if (!sessionSecret) {
+    if (isApiPath(pathname)) {
+      return NextResponse.json(
+        { code: "SESSION_DISABLED", message: "session secret is not configured" },
+        { status: 503 },
+      );
+    }
+
+    return new NextResponse("session secret is not configured", { status: 503 });
+  }
+
   const adminSession = request.cookies.get(ADMIN_SESSION_COOKIE)?.value ?? "";
-  if (adminSession === configuredAdminPassword) {
+  const adminAuthorized = await verifySessionToken(adminSession, "admin", sessionSecret);
+  if (adminAuthorized) {
     return NextResponse.next();
   }
 

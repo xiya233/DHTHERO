@@ -4,6 +4,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use serde::Serialize;
+use tracing::error;
 
 #[derive(Debug)]
 pub struct ApiError {
@@ -75,12 +76,14 @@ impl IntoResponse for ApiError {
 
 impl From<sqlx::Error> for ApiError {
     fn from(err: sqlx::Error) -> Self {
-        Self::internal(format!("database error: {err}"))
+        error!(error = ?err, "database error");
+        Self::internal("internal server error")
     }
 }
 
 impl From<anyhow::Error> for ApiError {
     fn from(err: anyhow::Error) -> Self {
-        Self::internal(format!("internal error: {err}"))
+        error!(error = ?err, "internal error");
+        Self::internal("internal server error")
     }
 }

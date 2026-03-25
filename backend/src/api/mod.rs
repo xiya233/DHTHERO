@@ -1,25 +1,26 @@
 pub mod dto;
 pub mod handlers;
 
-use crate::{error::ApiError, state::AppState};
+use crate::{config::AppConfig, error::ApiError, state::AppState};
 use axum::{
     Router,
     body::Body,
-    http::{Method, Request},
+    http::{
+        Method, Request,
+        header::{ACCEPT, CONTENT_TYPE, HeaderName, HeaderValue},
+    },
     middleware::{self, Next},
     response::Response,
     routing::get,
 };
+use tracing::warn;
 use tower_http::{
-    cors::{Any, CorsLayer},
+    cors::{AllowOrigin, Any, CorsLayer},
     trace::TraceLayer,
 };
 
 pub fn build_router(state: AppState) -> Router {
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods([Method::GET, Method::PUT])
-        .allow_headers(Any);
+    let cors = build_cors_layer(state.config.as_ref());
 
     Router::new()
         .route("/api/v1/healthz", get(handlers::healthz))
@@ -50,6 +51,40 @@ pub fn build_router(state: AppState) -> Router {
             private_mode_guard,
         ))
         .with_state(state)
+}
+
+fn build_cors_layer(config: &AppConfig) -> CorsLayer {
+    let cors = CorsLayer::new()
+        .allow_methods([Method::GET, Method::PUT, Method::OPTIONS])
+        .allow_headers([
+            ACCEPT,
+            CONTENT_TYPE,
+            HeaderName::from_static("x-site-password"),
+            HeaderName::from_static("x-admin-password"),
+        ]);
+
+    if config.cors_allowed_origins.is_empty() {
+        return cors.allow_origin(Any);
+    }
+
+    let origins = config
+        .cors_allowed_origins
+        .iter()
+        .filter_map(|origin| match HeaderValue::from_str(origin) {
+            Ok(value) => Some(value),
+            Err(err) => {
+                warn!(origin = %origin, error = %err, "invalid cors origin ignored");
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if origins.is_empty() {
+        warn!("all configured cors origins are invalid, falling back to Any");
+        cors.allow_origin(Any)
+    } else {
+        cors.allow_origin(AllowOrigin::list(origins))
+    }
 }
 
 async fn private_mode_guard(

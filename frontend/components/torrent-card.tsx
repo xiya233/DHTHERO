@@ -4,6 +4,7 @@ import type { TorrentListItem } from "@/lib/api";
 import { formatBytes, formatDate } from "@/lib/format";
 import { localizeCategoryLabel, type SiteCopy } from "@/lib/i18n";
 import type { SiteLocale } from "@/lib/site-preferences";
+import { safeMagnetHref } from "@/lib/url-safety";
 
 type TorrentCardProps = {
   item: TorrentListItem;
@@ -12,6 +13,7 @@ type TorrentCardProps = {
 };
 
 export function TorrentCard({ item, locale = "en", labels }: TorrentCardProps) {
+  const magnetHref = safeMagnetHref(item.magnet_link);
   const text = labels ?? {
     untitled: "Untitled",
     hash: "Hash",
@@ -66,12 +68,21 @@ export function TorrentCard({ item, locale = "en", labels }: TorrentCardProps) {
       </div>
 
       <footer className="mt-4 flex flex-wrap gap-3 text-sm">
-        <a
-          href={item.magnet_link}
-          className="bauhaus-shadow-sm bauhaus-press inline-flex items-center justify-center border-2 border-ink bg-accent-yellow px-3 py-1 font-bold uppercase tracking-wide transition-all hover:bg-ink hover:text-paper"
-        >
-          {text.magnet}
-        </a>
+        {magnetHref ? (
+          <a
+            href={magnetHref}
+            className="bauhaus-shadow-sm bauhaus-press inline-flex items-center justify-center border-2 border-ink bg-accent-yellow px-3 py-1 font-bold uppercase tracking-wide transition-all hover:bg-ink hover:text-paper"
+          >
+            {text.magnet}
+          </a>
+        ) : (
+          <span
+            aria-disabled="true"
+            className="inline-flex cursor-not-allowed items-center justify-center border-2 border-ink bg-accent-yellow px-3 py-1 font-bold uppercase tracking-wide opacity-60"
+          >
+            {text.magnet}
+          </span>
+        )}
         <Link
           href={`/torrent/${item.info_hash}`}
           className="bauhaus-shadow-sm bauhaus-press inline-flex items-center justify-center border-2 border-ink bg-paper px-3 py-1 font-bold uppercase tracking-wide transition-all hover:bg-accent-blue hover:text-paper"

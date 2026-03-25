@@ -50,6 +50,8 @@ export function SitePreferenceControls({
     return domTheme ?? storedTheme ?? initialTheme;
   });
   const copy = useMemo(() => getCopy(locale), [locale]);
+  const buttonClass =
+    "bauhaus-shadow-sm bauhaus-press inline-flex border-2 border-ink bg-paper p-2 transition-all hover:bg-accent-yellow";
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -79,18 +81,16 @@ export function SitePreferenceControls({
         type="button"
         onClick={onToggleLocale}
         aria-label={copy.layout.langSwitchAria}
-        className="bauhaus-shadow-sm bauhaus-press inline-flex items-center gap-1 border-2 border-ink bg-paper px-2 py-1 font-headline text-xs font-bold uppercase transition-all hover:bg-accent-yellow"
+        className={buttonClass}
       >
-        <BauhausIcon name="language" className="size-4" />
-        <span>文/A</span>
-        <span className="text-[10px]">{copy.layout.langButtonLabel}</span>
+        <BauhausIcon name="language" className="size-5" />
       </button>
 
       <button
         type="button"
         onClick={onToggleTheme}
         aria-label={copy.layout.themeSwitchAria}
-        className="bauhaus-shadow-sm bauhaus-press inline-flex border-2 border-ink bg-paper p-2 transition-all hover:bg-accent-yellow"
+        className={buttonClass}
       >
         <BauhausIcon
           name={theme === "dark" ? "light_mode" : "dark_mode"}

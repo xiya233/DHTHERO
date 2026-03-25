@@ -4,6 +4,7 @@ import { getFeatures, getTorrentDetail, getTorrentFiles } from "@/lib/api";
 import { formatBytes, formatDate } from "@/lib/format";
 import { getCopy, localizeCategoryLabel } from "@/lib/i18n";
 import { getServerSitePreferences } from "@/lib/site-preferences-server";
+import { safeMagnetHref } from "@/lib/url-safety";
 
 type TorrentDetailPageProps = {
   params: Promise<{
@@ -24,6 +25,7 @@ export default async function TorrentDetailPage({ params }: TorrentDetailPagePro
   const files = features.file_tree_enabled
     ? await getTorrentFiles(detail.info_hash, false)
     : detail.files_preview;
+  const magnetHref = safeMagnetHref(detail.magnet_link);
 
   return (
     <div className="space-y-8">
@@ -58,12 +60,21 @@ export default async function TorrentDetailPage({ params }: TorrentDetailPagePro
         </div>
 
         <div className="mt-6">
-          <a
-            href={detail.magnet_link}
-            className="bauhaus-shadow-sm bauhaus-press inline-flex border-2 border-ink bg-accent-yellow px-4 py-2 font-headline text-sm font-black uppercase tracking-wider transition-all hover:bg-ink hover:text-paper"
-          >
-            {copy.torrent.openMagnet}
-          </a>
+          {magnetHref ? (
+            <a
+              href={magnetHref}
+              className="bauhaus-shadow-sm bauhaus-press inline-flex border-2 border-ink bg-accent-yellow px-4 py-2 font-headline text-sm font-black uppercase tracking-wider transition-all hover:bg-ink hover:text-paper"
+            >
+              {copy.torrent.openMagnet}
+            </a>
+          ) : (
+            <span
+              aria-disabled="true"
+              className="inline-flex cursor-not-allowed border-2 border-ink bg-accent-yellow px-4 py-2 font-headline text-sm font-black uppercase tracking-wider opacity-60"
+            >
+              {copy.torrent.openMagnet}
+            </span>
+          )}
         </div>
       </section>
 

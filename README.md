@@ -53,10 +53,12 @@ Admin dashboard (crawler metrics):
 
 - Backend env:
   - `ADMIN_DASHBOARD_PASSWORD=your_password`
+  - `CORS_ALLOWED_ORIGINS=http://localhost:3000` (set your frontend domain in production)
   - `CRAWLER_PROMETHEUS_ENABLED=true`
   - `CRAWLER_PROMETHEUS_LISTEN_ADDR=0.0.0.0:9000`
 - Frontend env:
   - `ADMIN_DASHBOARD_PASSWORD=your_password`
+  - `SESSION_SECRET=long_random_secret`
 - Visit:
   - `http://localhost:3000/admin/login`
   - Prometheus metrics endpoint: `http://localhost:9000/metrics`
@@ -70,9 +72,12 @@ Private mode (site + backend API password gate):
 - Frontend env:
   - `PRIVATE_MODE_ENABLED=true`
   - `PRIVATE_SITE_PASSWORD=your_password`
+  - `SESSION_SECRET=long_random_secret`
 - Behavior:
   - When enabled, browser must login at `http://localhost:3000/login`
   - Backend requires header `x-site-password` for `/api/v1/*` except `/api/v1/healthz`
+  - Frontend login/admin sessions use signed cookie tokens (no plaintext password in cookie)
+  - Login endpoints include in-memory rate limit for brute-force mitigation
   - `/admin` remains double-protected (site login + admin password)
 
 ## Frontend

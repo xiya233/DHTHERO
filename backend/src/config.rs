@@ -63,6 +63,7 @@ impl PrivateModeConfig {
 pub struct AppConfig {
     pub server_host: String,
     pub server_port: u16,
+    pub cors_allowed_origins: Vec<String>,
     pub database_url: String,
     pub database_max_connections: u32,
     pub search_max_page_size: u32,
@@ -81,6 +82,7 @@ impl AppConfig {
         Ok(Self {
             server_host: env_or("SERVER_HOST", "0.0.0.0"),
             server_port: parse_env("SERVER_PORT", 8080u16)?,
+            cors_allowed_origins: parse_csv_env("CORS_ALLOWED_ORIGINS"),
             database_url,
             database_max_connections: parse_env("DATABASE_MAX_CONNECTIONS", 20u32)?,
             search_max_page_size: parse_env("SEARCH_MAX_PAGE_SIZE", 100u32)?,
@@ -163,6 +165,18 @@ fn optional_env(key: &str) -> Option<String> {
             }
         }
         Err(_) => None,
+    }
+}
+
+fn parse_csv_env(key: &str) -> Vec<String> {
+    match env::var(key) {
+        Ok(raw) => raw
+            .split(',')
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned)
+            .collect(),
+        Err(_) => Vec::new(),
     }
 }
 
