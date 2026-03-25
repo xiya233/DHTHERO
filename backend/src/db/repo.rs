@@ -290,8 +290,8 @@ pub async fn fetch_torrents_by_info_hashes(
             t.last_seen_at,
             COALESCE(h.trend_score, 0)::double precision AS trend_score,
             COALESCE(h.observations, 0)::bigint AS observations
-        FROM unnest($1::text[]) WITH ORDINALITY AS input(info_hash, ord)
-        JOIN torrents t ON t.info_hash::text = input.info_hash
+        FROM unnest($1::varchar[]) WITH ORDINALITY AS input(info_hash, ord)
+        JOIN torrents t ON t.info_hash = input.info_hash
         LEFT JOIN LATERAL (
             SELECT
                 COALESCE(SUM(hs.trend_score), 0)::double precision AS trend_score,
@@ -514,8 +514,8 @@ pub async fn fetch_meili_docs_by_info_hashes(
             t.file_count,
             t.first_seen_at,
             t.last_seen_at
-        FROM unnest($1::text[]) WITH ORDINALITY AS input(info_hash, ord)
-        JOIN torrents t ON t.info_hash::text = input.info_hash
+        FROM unnest($1::varchar[]) WITH ORDINALITY AS input(info_hash, ord)
+        JOIN torrents t ON t.info_hash = input.info_hash
         ORDER BY input.ord ASC
         "#,
     )
