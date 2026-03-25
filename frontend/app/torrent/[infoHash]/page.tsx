@@ -13,15 +13,16 @@ type TorrentDetailPageProps = {
 };
 
 export default async function TorrentDetailPage({ params }: TorrentDetailPageProps) {
-  const { locale } = await getServerSitePreferences();
+  const [{ locale }, { infoHash }] = await Promise.all([
+    getServerSitePreferences(),
+    params,
+  ]);
   const copy = getCopy(locale);
-  const { infoHash } = await params;
-  const detail = await getTorrentDetail(infoHash);
+  const [detail, features] = await Promise.all([getTorrentDetail(infoHash), getFeatures()]);
   if (!detail) {
     notFound();
   }
 
-  const features = await getFeatures();
   const files = features.file_tree_enabled
     ? await getTorrentFiles(detail.info_hash, false)
     : detail.files_preview;

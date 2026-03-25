@@ -453,6 +453,22 @@ pub async fn fetch_torrent_detail(
     .await
 }
 
+pub async fn torrent_exists(pool: &PgPool, info_hash: &str) -> Result<bool, sqlx::Error> {
+    let exists = sqlx::query_scalar::<_, Option<i32>>(
+        r#"
+        SELECT 1
+        FROM torrents
+        WHERE info_hash = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(info_hash)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(exists.flatten().is_some())
+}
+
 pub async fn fetch_meili_docs_batch(
     pool: &PgPool,
     limit: i64,

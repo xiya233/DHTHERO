@@ -23,7 +23,7 @@ use chrono::Utc;
 use std::{
     collections::BTreeSet, collections::HashMap, net::IpAddr, net::SocketAddr, time::Instant,
 };
-use tracing::warn;
+use tracing::{info, warn};
 
 const SITE_TITLE_MAX_LEN: usize = 120;
 const SITE_DESCRIPTION_MAX_LEN: usize = 300;
@@ -376,22 +376,40 @@ pub async fn torrent_detail(
     State(state): State<AppState>,
     Path(info_hash): Path<String>,
 ) -> Result<Json<TorrentDetailResponse>, ApiError> {
+    let api_start = Instant::now();
     let info_hash = normalize_info_hash(&info_hash)?;
 
+    let detail_db_start = Instant::now();
     let row = repo::fetch_torrent_detail(&state.pool, &info_hash)
         .await?
         .ok_or_else(|| ApiError::not_found("torrent not found"))?;
+    let detail_db_ms = detail_db_start.elapsed().as_millis() as i64;
 
-    let preview_rows = repo::fetch_torrent_files_preview(&state.pool, &info_hash, 20).await?;
-    let files_preview = preview_rows
-        .into_iter()
-        .map(|entry| TorrentFileEntry {
-            path: entry.path,
-            size: entry.size,
-            depth: entry.depth,
-            is_dir: false,
-        })
-        .collect();
+    let preview_db_start = Instant::now();
+    let files_preview = if state.config.features.file_tree_enabled {
+        Vec::new()
+    } else {
+        let preview_rows = repo::fetch_torrent_files_preview(&state.pool, &info_hash, 20).await?;
+        preview_rows
+            .into_iter()
+            .map(|entry| TorrentFileEntry {
+                path: entry.path,
+                size: entry.size,
+                depth: entry.depth,
+                is_dir: false,
+            })
+            .collect()
+    };
+    let preview_db_ms = preview_db_start.elapsed().as_millis() as i64;
+
+    info!(
+        info_hash = %info_hash,
+        detail_db_ms,
+        preview_db_ms,
+        file_tree_enabled = state.config.features.file_tree_enabled,
+        total_ms = api_start.elapsed().as_millis() as i64,
+        "torrent_detail timing"
+    );
 
     Ok(Json(map_torrent_detail(row, files_preview)))
 }
@@ -403,18 +421,22 @@ pub async fn torrent_files(
 ) -> Result<Json<TorrentFilesResponse>, ApiError> {
     ensure_feature(state.config.features.file_tree_enabled, "file_tree")?;
 
+    let api_start = Instant::now();
     let info_hash = normalize_info_hash(&info_hash)?;
 
-    let exists = repo::fetch_torrent_detail(&state.pool, &info_hash)
-        .await?
-        .is_some();
+    let exists_db_start = Instant::now();
+    let exists = repo::torrent_exists(&state.pool, &info_hash).await?;
+    let exists_db_ms = exists_db_start.elapsed().as_millis() as i64;
     if !exists {
         return Err(ApiError::not_found("torrent not found"));
     }
 
+    let files_db_start = Instant::now();
     let files = repo::fetch_torrent_files(&state.pool, &info_hash).await?;
+    let files_db_ms = files_db_start.elapsed().as_millis() as i64;
     let flat = query.flat.unwrap_or(false);
 
+    let tree_build_start = Instant::now();
     let result_files = if flat {
         files
             .into_iter()
@@ -428,6 +450,18 @@ pub async fn torrent_files(
     } else {
         build_file_tree(files)
     };
+    let tree_build_ms = tree_build_start.elapsed().as_millis() as i64;
+
+    info!(
+        info_hash = %info_hash,
+        flat,
+        exists_db_ms,
+        files_db_ms,
+        tree_build_ms,
+        file_count = result_files.len(),
+        total_ms = api_start.elapsed().as_millis() as i64,
+        "torrent_files timing"
+    );
 
     Ok(Json(TorrentFilesResponse {
         files: result_files,
