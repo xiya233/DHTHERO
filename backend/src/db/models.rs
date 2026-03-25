@@ -9,6 +9,14 @@ pub struct SiteStatsRow {
 }
 
 #[derive(Debug, Clone, FromRow)]
+pub struct SiteSettingsRow {
+    pub site_title: String,
+    pub site_description: String,
+    pub home_hero_markdown: String,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, FromRow)]
 pub struct TorrentListRow {
     pub info_hash: String,
     pub name: String,

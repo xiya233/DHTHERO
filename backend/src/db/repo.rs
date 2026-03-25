@@ -1,5 +1,6 @@
 use crate::db::models::{
-    CategoryCountRow, MeiliDocRow, SiteStatsRow, TorrentDetailRow, TorrentFileRow, TorrentListRow,
+    CategoryCountRow, MeiliDocRow, SiteSettingsRow, SiteStatsRow, TorrentDetailRow, TorrentFileRow,
+    TorrentListRow,
 };
 use sqlx::{PgPool, Postgres, QueryBuilder};
 #[derive(Debug, Clone, Copy)]
@@ -117,6 +118,56 @@ pub async fn fetch_site_stats(pool: &PgPool) -> Result<SiteStatsRow, sqlx::Error
         FROM torrents
         "#,
     )
+    .fetch_one(pool)
+    .await
+}
+
+pub async fn fetch_site_settings(pool: &PgPool) -> Result<SiteSettingsRow, sqlx::Error> {
+    sqlx::query_as::<_, SiteSettingsRow>(
+        r#"
+        SELECT
+            site_title,
+            site_description,
+            home_hero_markdown,
+            updated_at
+        FROM site_settings
+        WHERE id = 1
+        "#,
+    )
+    .fetch_one(pool)
+    .await
+}
+
+pub async fn upsert_site_settings(
+    pool: &PgPool,
+    site_title: &str,
+    site_description: &str,
+    home_hero_markdown: &str,
+) -> Result<SiteSettingsRow, sqlx::Error> {
+    sqlx::query_as::<_, SiteSettingsRow>(
+        r#"
+        INSERT INTO site_settings (
+            id,
+            site_title,
+            site_description,
+            home_hero_markdown
+        ) VALUES (1, $1, $2, $3)
+        ON CONFLICT (id)
+        DO UPDATE SET
+            site_title = EXCLUDED.site_title,
+            site_description = EXCLUDED.site_description,
+            home_hero_markdown = EXCLUDED.home_hero_markdown,
+            updated_at = NOW()
+        RETURNING
+            site_title,
+            site_description,
+            home_hero_markdown,
+            updated_at
+        "#,
+    )
+    .bind(site_title)
+    .bind(site_description)
+    .bind(home_hero_markdown)
     .fetch_one(pool)
     .await
 }

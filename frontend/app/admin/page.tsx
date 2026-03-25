@@ -12,6 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import ReactMarkdown from "react-markdown";
 
 import {
   ChartContainer,
@@ -70,6 +71,13 @@ type AdminDashboardResponse = {
   tabs: AdminDashboardTab[];
 };
 
+type SiteSettingsResponse = {
+  site_title: string;
+  site_description: string;
+  home_hero_markdown: string;
+  updated_at: string | null;
+};
+
 type ChartRow = {
   timestamp: string;
   timeLabel: string;
@@ -120,6 +128,14 @@ function chartColor(index: number): string {
   return CHART_COLORS[index % CHART_COLORS.length];
 }
 
+function heroMarkdownForRender(markdown: string): string {
+  const normalized = markdown.trim().replace(/\r\n?/g, "\n");
+  if (!normalized) {
+    return "SEARCH  \nTHE_NET";
+  }
+  return normalized.replace(/\n/g, "  \n");
+}
+
 function buildChartConfig(chart: AdminDashboardChart): ChartConfig {
   return Object.fromEntries(
     chart.series.map((series, index) => [
@@ -166,6 +182,16 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [activeTabId, setActiveTabId] = useState<string>("overview");
+  const [settings, setSettings] = useState<SiteSettingsResponse>({
+    site_title: "DHT_MAGNET",
+    site_description: "Bauhaus inspired DHT magnet search engine",
+    home_hero_markdown: "SEARCH\nTHE_NET",
+    updated_at: null,
+  });
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -217,6 +243,56 @@ export default function AdminDashboardPage() {
   }, []);
 
   useEffect(() => {
+    let stopped = false;
+
+    const loadSettings = async () => {
+      try {
+        setSettingsLoading(true);
+        const response = await fetch("/api/admin/site-settings", {
+          cache: "no-store",
+        });
+
+        if (response.status === 401) {
+          window.location.href = "/admin/login";
+          return;
+        }
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as
+            | { message?: string }
+            | null;
+          throw new Error(payload?.message || `site settings request failed: ${response.status}`);
+        }
+
+        const payload = (await response.json()) as SiteSettingsResponse;
+        if (!stopped) {
+          setSettings({
+            site_title: payload.site_title,
+            site_description: payload.site_description,
+            home_hero_markdown: payload.home_hero_markdown,
+            updated_at: payload.updated_at,
+          });
+          setSettingsError(null);
+        }
+      } catch (err) {
+        if (!stopped) {
+          const message = err instanceof Error ? err.message : "failed to load site settings";
+          setSettingsError(message);
+        }
+      } finally {
+        if (!stopped) {
+          setSettingsLoading(false);
+        }
+      }
+    };
+
+    void loadSettings();
+    return () => {
+      stopped = true;
+    };
+  }, []);
+
+  useEffect(() => {
     const tabs = data?.tabs ?? [];
     if (!tabs.length) {
       return;
@@ -235,6 +311,54 @@ export default function AdminDashboardPage() {
   async function logout() {
     await fetch("/api/admin/logout", { method: "POST" });
     window.location.href = "/admin/login";
+  }
+
+  async function saveSettings() {
+    setSettingsSaving(true);
+    setSettingsError(null);
+    setSettingsNotice(null);
+
+    try {
+      const response = await fetch("/api/admin/site-settings", {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          site_title: settings.site_title,
+          site_description: settings.site_description,
+          home_hero_markdown: settings.home_hero_markdown,
+        }),
+      });
+
+      if (response.status === 401) {
+        window.location.href = "/admin/login";
+        return;
+      }
+
+      const payload = (await response.json().catch(() => null)) as
+        | (SiteSettingsResponse & { message?: string })
+        | { message?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.message || "failed to save site settings");
+      }
+
+      const data = payload as SiteSettingsResponse;
+      setSettings({
+        site_title: data.site_title,
+        site_description: data.site_description,
+        home_hero_markdown: data.home_hero_markdown,
+        updated_at: data.updated_at,
+      });
+      setSettingsNotice("Saved. Site content updated immediately.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to save site settings";
+      setSettingsError(message);
+    } finally {
+      setSettingsSaving(false);
+    }
   }
 
   if (!data && error) {
@@ -322,6 +446,89 @@ export default function AdminDashboardPage() {
             <p className="font-headline text-2xl font-black uppercase">
               {formatPercent(data?.now.udp_receive_drop_rate ?? 0)}
             </p>
+          </article>
+        </div>
+      </section>
+
+      <section className="border-4 border-ink bg-paper p-6 shadow-hard-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-headline text-3xl font-black uppercase">Site Settings</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              Control metadata title/description and homepage hero markdown.
+            </p>
+          </div>
+          <button
+            onClick={saveSettings}
+            disabled={settingsSaving || settingsLoading}
+            className="bauhaus-shadow-sm bauhaus-press border-2 border-ink bg-accent-yellow px-4 py-2 font-headline text-sm font-black uppercase transition-all hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {settingsSaving ? "Saving..." : "Save Settings"}
+          </button>
+        </div>
+
+        {settingsError ? <p className="mt-4 text-sm text-accent-red">{settingsError}</p> : null}
+        {settingsNotice ? <p className="mt-4 text-sm text-ink">{settingsNotice}</p> : null}
+
+        <div className="mt-5 grid gap-5 xl:grid-cols-2">
+          <div className="space-y-4">
+            <label className="block space-y-1">
+              <span className="text-xs font-bold uppercase text-ink-muted">Site Title</span>
+              <input
+                value={settings.site_title}
+                disabled={settingsLoading || settingsSaving}
+                onChange={(event) => {
+                  setSettings((prev) => ({ ...prev, site_title: event.target.value }));
+                  setSettingsNotice(null);
+                }}
+                className="w-full border-2 border-ink bg-paper px-3 py-2 font-headline text-sm font-bold uppercase outline-none"
+              />
+            </label>
+
+            <label className="block space-y-1">
+              <span className="text-xs font-bold uppercase text-ink-muted">Site Description</span>
+              <textarea
+                value={settings.site_description}
+                disabled={settingsLoading || settingsSaving}
+                onChange={(event) => {
+                  setSettings((prev) => ({ ...prev, site_description: event.target.value }));
+                  setSettingsNotice(null);
+                }}
+                rows={3}
+                className="w-full resize-y border-2 border-ink bg-paper px-3 py-2 text-sm outline-none"
+              />
+            </label>
+
+            <label className="block space-y-1">
+              <span className="text-xs font-bold uppercase text-ink-muted">Home Hero Markdown</span>
+              <textarea
+                value={settings.home_hero_markdown}
+                disabled={settingsLoading || settingsSaving}
+                onChange={(event) => {
+                  setSettings((prev) => ({ ...prev, home_hero_markdown: event.target.value }));
+                  setSettingsNotice(null);
+                }}
+                rows={6}
+                className="w-full resize-y border-2 border-ink bg-paper px-3 py-2 font-headline text-base font-bold uppercase leading-tight outline-none"
+              />
+            </label>
+
+            <p className="text-xs uppercase text-ink-muted">
+              Updated at: {formatTimestamp(settings.updated_at ?? undefined)}
+            </p>
+          </div>
+
+          <article className="border-2 border-ink bg-paper-soft p-4">
+            <p className="text-xs uppercase text-ink-muted">Hero Preview</p>
+            <div className="mt-3 font-headline text-5xl font-black uppercase leading-none tracking-tighter md:text-7xl">
+              <ReactMarkdown
+                components={{
+                  p: ({ children }) => <p className="m-0">{children}</p>,
+                }}
+              >
+                {heroMarkdownForRender(settings.home_hero_markdown)}
+              </ReactMarkdown>
+            </div>
           </article>
         </div>
       </section>

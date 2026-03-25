@@ -1,3 +1,5 @@
+import { getPrivateSitePasswordFromEnv, isPrivateModeActiveFromEnv } from "@/lib/site-auth";
+
 export type FeatureFlags = {
   search_enabled: boolean;
   latest_enabled: boolean;
@@ -11,6 +13,13 @@ export type SiteStats = {
   total_size_bytes: number;
   last_crawl_at: string | null;
   crawler_status: string;
+};
+
+export type SiteContent = {
+  site_title: string;
+  site_description: string;
+  home_hero_markdown: string;
+  updated_at: string | null;
 };
 
 export type CategoryItem = {
@@ -69,12 +78,25 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
   "http://localhost:8080";
 
+export const DEFAULT_SITE_CONTENT: SiteContent = {
+  site_title: "DHT_MAGNET",
+  site_description: "Bauhaus inspired DHT magnet search engine",
+  home_hero_markdown: "SEARCH\nTHE_NET",
+  updated_at: null,
+};
+
 async function apiFetch<T>(path: string): Promise<T> {
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+  };
+
+  if (isPrivateModeActiveFromEnv()) {
+    headers["x-site-password"] = getPrivateSitePasswordFromEnv();
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     cache: "no-store",
-    headers: {
-      Accept: "application/json",
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -117,6 +139,14 @@ export async function getSiteStats(): Promise<SiteStats | null> {
     return await apiFetch<SiteStats>("/api/v1/site/stats");
   } catch {
     return null;
+  }
+}
+
+export async function getSiteContent(): Promise<SiteContent> {
+  try {
+    return await apiFetch<SiteContent>("/api/v1/site/content");
+  } catch {
+    return DEFAULT_SITE_CONTENT;
   }
 }
 

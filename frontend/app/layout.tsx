@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Inter, Space_Grotesk } from "next/font/google";
 
 import { BauhausIcon } from "@/components/bauhaus-icon";
-import { getFeatures } from "@/lib/api";
+import { getFeatures, getSiteContent } from "@/lib/api";
 import "./globals.css";
 
 const inter = Inter({
@@ -16,17 +16,20 @@ const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "DHT_MAGNET",
-  description: "Bauhaus inspired DHT magnet search engine",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const siteContent = await getSiteContent();
+  return {
+    title: siteContent.site_title,
+    description: siteContent.site_description,
+  };
+}
 
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const features = await getFeatures();
+  const [features, siteContent] = await Promise.all([getFeatures(), getSiteContent()]);
 
   return (
     <html
@@ -41,7 +44,7 @@ export default async function RootLayout({
                 href="/"
                 className="border-2 border-ink px-2 py-1 font-headline text-3xl font-black uppercase tracking-tighter"
               >
-                DHT_MAGNET
+                {siteContent.site_title}
               </Link>
 
               <nav className="hidden gap-8 font-headline text-sm font-bold uppercase tracking-tighter md:flex">

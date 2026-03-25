@@ -1,11 +1,12 @@
 use crate::{
     api::dto::{
         ApiListResponse, CategoriesResponse, CategoryItem, FeaturesResponse, HealthResponse,
-        ListQuery, Pagination, SearchQuery, SiteStatsResponse, TorrentDetailResponse,
-        TorrentFileEntry, TorrentFilesQuery, TorrentFilesResponse, TorrentListItem, TrendingQuery,
+        ListQuery, Pagination, SearchQuery, SiteContentResponse, SiteSettingsUpdateRequest,
+        SiteStatsResponse, TorrentDetailResponse, TorrentFileEntry, TorrentFilesQuery,
+        TorrentFilesResponse, TorrentListItem, TrendingQuery,
     },
     db::{
-        models::{TorrentDetailRow, TorrentFileRow, TorrentListRow},
+        models::{SiteSettingsRow, TorrentDetailRow, TorrentFileRow, TorrentListRow},
         repo::{self, LatestParams, SearchAuditLogInput, SearchParams, TrendingParams},
     },
     domain::category::{Category, all_category_meta},
@@ -23,6 +24,10 @@ use std::{
     collections::BTreeSet, collections::HashMap, net::IpAddr, net::SocketAddr, time::Instant,
 };
 use tracing::warn;
+
+const SITE_TITLE_MAX_LEN: usize = 120;
+const SITE_DESCRIPTION_MAX_LEN: usize = 300;
+const HOME_HERO_MARKDOWN_MAX_LEN: usize = 2_000;
 
 pub async fn healthz() -> Json<HealthResponse> {
     Json(HealthResponse {
@@ -61,6 +66,53 @@ pub async fn site_stats(
         last_crawl_at: stats.last_crawl_at,
         crawler_status,
     }))
+}
+
+pub async fn site_content(
+    State(state): State<AppState>,
+) -> Result<Json<SiteContentResponse>, ApiError> {
+    let settings = repo::fetch_site_settings(&state.pool).await?;
+    Ok(Json(map_site_content(settings)))
+}
+
+pub async fn admin_site_settings_get(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<SiteContentResponse>, ApiError> {
+    ensure_admin_authorized(&state, &headers)?;
+    let settings = repo::fetch_site_settings(&state.pool).await?;
+    Ok(Json(map_site_content(settings)))
+}
+
+pub async fn admin_site_settings_put(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<SiteSettingsUpdateRequest>,
+) -> Result<Json<SiteContentResponse>, ApiError> {
+    ensure_admin_authorized(&state, &headers)?;
+
+    let site_title =
+        normalize_site_setting_field(&payload.site_title, "site_title", SITE_TITLE_MAX_LEN)?;
+    let site_description = normalize_site_setting_field(
+        &payload.site_description,
+        "site_description",
+        SITE_DESCRIPTION_MAX_LEN,
+    )?;
+    let home_hero_markdown = normalize_site_setting_field(
+        &payload.home_hero_markdown,
+        "home_hero_markdown",
+        HOME_HERO_MARKDOWN_MAX_LEN,
+    )?;
+
+    let updated = repo::upsert_site_settings(
+        &state.pool,
+        &site_title,
+        &site_description,
+        &home_hero_markdown,
+    )
+    .await?;
+
+    Ok(Json(map_site_content(updated)))
 }
 
 pub async fn categories(
@@ -413,6 +465,27 @@ fn parse_category(value: Option<&str>) -> Result<Option<i16>, ApiError> {
         .map(|category| category.map(Category::code))
 }
 
+fn normalize_site_setting_field(
+    value: &str,
+    field_name: &str,
+    max_len: usize,
+) -> Result<String, ApiError> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(ApiError::bad_request(format!(
+            "field '{field_name}' cannot be empty"
+        )));
+    }
+
+    if trimmed.chars().count() > max_len {
+        return Err(ApiError::bad_request(format!(
+            "field '{field_name}' exceeds max length {max_len}"
+        )));
+    }
+
+    Ok(trimmed.to_string())
+}
+
 fn normalize_info_hash(value: &str) -> Result<String, ApiError> {
     let normalized = value.trim().to_ascii_lowercase();
     if normalized.len() != 40 || !normalized.chars().all(|ch| ch.is_ascii_hexdigit()) {
@@ -434,6 +507,15 @@ fn map_torrent_item(row: TorrentListRow) -> TorrentListItem {
         last_seen_at: row.last_seen_at,
         trend_score: row.trend_score,
         observations: row.observations,
+    }
+}
+
+fn map_site_content(row: SiteSettingsRow) -> SiteContentResponse {
+    SiteContentResponse {
+        site_title: row.site_title,
+        site_description: row.site_description,
+        home_hero_markdown: row.home_hero_markdown,
+        updated_at: row.updated_at,
     }
 }
 

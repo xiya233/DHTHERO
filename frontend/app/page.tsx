@@ -1,7 +1,8 @@
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
 
 import { BauhausIcon } from "@/components/bauhaus-icon";
-import { getCategories, getFeatures, getSiteStats } from "@/lib/api";
+import { getCategories, getFeatures, getSiteContent, getSiteStats } from "@/lib/api";
 import { formatCompactNumber, formatNumber } from "@/lib/format";
 
 const FIXED_CATEGORY_ORDER = [
@@ -13,11 +14,20 @@ const FIXED_CATEGORY_ORDER = [
   { key: "other", label: "Other", icon: "other" },
 ] as const;
 
+function heroMarkdownForRender(markdown: string): string {
+  const normalized = markdown.trim().replace(/\r\n?/g, "\n");
+  if (!normalized) {
+    return "SEARCH  \nTHE_NET";
+  }
+  return normalized.replace(/\n/g, "  \n");
+}
+
 export default async function HomePage() {
-  const [features, stats, categories] = await Promise.all([
+  const [features, stats, categories, siteContent] = await Promise.all([
     getFeatures(),
     getSiteStats(),
     getCategories(),
+    getSiteContent(),
   ]);
 
   const categoryCountMap = new Map(categories.map((item) => [item.key, item.count]));
@@ -29,11 +39,15 @@ export default async function HomePage() {
   return (
     <>
       <section className="mb-16 w-full max-w-4xl text-center">
-        <h1 className="mb-4 font-headline text-7xl font-black uppercase leading-none tracking-tighter md:text-9xl">
-          SEARCH
-          <br />
-          THE_NET
-        </h1>
+        <div className="mb-4 font-headline text-7xl font-black uppercase leading-none tracking-tighter md:text-9xl">
+          <ReactMarkdown
+            components={{
+              p: ({ children }) => <p className="m-0">{children}</p>,
+            }}
+          >
+            {heroMarkdownForRender(siteContent.home_hero_markdown)}
+          </ReactMarkdown>
+        </div>
         <div className="flex justify-center">
           <div className="inline-block border-2 border-ink bg-ink px-4 py-1 font-headline text-sm font-bold uppercase tracking-widest text-paper">
             Total Torrents Indexed: {formatNumber(stats?.total_torrents_indexed ?? 0)}

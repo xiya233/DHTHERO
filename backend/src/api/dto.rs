@@ -30,6 +30,13 @@ pub struct TorrentFilesQuery {
     pub flat: Option<bool>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct SiteSettingsUpdateRequest {
+    pub site_title: String,
+    pub site_description: String,
+    pub home_hero_markdown: String,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Pagination {
     pub page: u32,
@@ -75,6 +82,14 @@ pub struct SiteStatsResponse {
     pub total_size_bytes: i64,
     pub last_crawl_at: Option<DateTime<Utc>>,
     pub crawler_status: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SiteContentResponse {
+    pub site_title: String,
+    pub site_description: String,
+    pub home_hero_markdown: String,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize)]

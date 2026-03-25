@@ -59,6 +59,20 @@ Admin dashboard (crawler metrics):
 - Visit:
   - `http://localhost:3000/admin/login`
   - Prometheus metrics endpoint: `http://localhost:9000/metrics`
+  - Site copy (title/description/home hero markdown) can be edited in `/admin`
+
+Private mode (site + backend API password gate):
+
+- Backend env:
+  - `PRIVATE_MODE_ENABLED=true`
+  - `PRIVATE_SITE_PASSWORD=your_password`
+- Frontend env:
+  - `PRIVATE_MODE_ENABLED=true`
+  - `PRIVATE_SITE_PASSWORD=your_password`
+- Behavior:
+  - When enabled, browser must login at `http://localhost:3000/login`
+  - Backend requires header `x-site-password` for `/api/v1/*` except `/api/v1/healthz`
+  - `/admin` remains double-protected (site login + admin password)
 
 ## Frontend
 
@@ -75,9 +89,12 @@ Frontend starts on `http://localhost:3000` and calls backend through `NEXT_PUBLI
 - `GET /api/v1/healthz`
 - `GET /api/v1/features`
 - `GET /api/v1/site/stats`
+- `GET /api/v1/site/content`
 - `GET /api/v1/categories`
 - `GET /api/v1/search?q=...`
 - `GET /api/v1/latest`
 - `GET /api/v1/trending?window=24h|72h|7d`
 - `GET /api/v1/torrents/{info_hash}`
 - `GET /api/v1/torrents/{info_hash}/files?flat=true|false`
+- `GET /api/v1/admin/site-settings` (admin password required)
+- `PUT /api/v1/admin/site-settings` (admin password required)

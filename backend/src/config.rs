@@ -48,6 +48,18 @@ pub struct AdminConfig {
 }
 
 #[derive(Debug, Clone)]
+pub struct PrivateModeConfig {
+    pub enabled: bool,
+    pub site_password: Option<String>,
+}
+
+impl PrivateModeConfig {
+    pub fn is_active(&self) -> bool {
+        self.enabled && self.site_password.is_some()
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct AppConfig {
     pub server_host: String,
     pub server_port: u16,
@@ -59,6 +71,7 @@ pub struct AppConfig {
     pub crawler: CrawlerConfig,
     pub meili: MeiliConfig,
     pub admin: AdminConfig,
+    pub private_mode: PrivateModeConfig,
 }
 
 impl AppConfig {
@@ -118,6 +131,10 @@ impl AppConfig {
                     5u64,
                 )?,
                 metrics_history_points: parse_env("ADMIN_METRICS_HISTORY_POINTS", 720usize)?,
+            },
+            private_mode: PrivateModeConfig {
+                enabled: parse_env_bool("PRIVATE_MODE_ENABLED", false)?,
+                site_password: optional_env("PRIVATE_SITE_PASSWORD"),
             },
         })
     }
