@@ -20,6 +20,17 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import {
+  getCopy,
+  localizeAdminChartTitle,
+  localizeAdminTabTitle,
+  type SiteCopy,
+} from "@/lib/i18n";
+import {
+  SITE_LOCALE_KEY,
+  normalizeSiteLocale,
+  type SiteLocale,
+} from "@/lib/site-preferences";
 
 type AdminDashboardPoint = {
   timestamp: string;
@@ -91,7 +102,7 @@ const CHART_COLORS = [
   "#f97316",
   "#6f42c1",
   "#0ea5e9",
-  "#111827",
+  "#14b8a6",
   "#b45309",
   "#ef4444",
 ];
@@ -109,11 +120,11 @@ function formatPercent(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
 }
 
-function formatTimestamp(value?: string): string {
+function formatTimestamp(value: string | undefined, locale: SiteLocale): string {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString("en-US", {
+  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
     hour12: false,
     year: "numeric",
     month: "2-digit",
@@ -148,7 +159,7 @@ function buildChartConfig(chart: AdminDashboardChart): ChartConfig {
   );
 }
 
-function buildChartRows(chart: AdminDashboardChart): ChartRow[] {
+function buildChartRows(chart: AdminDashboardChart, locale: SiteLocale): ChartRow[] {
   const byTimestamp = new Map<string, ChartRow>();
 
   for (const series of chart.series) {
@@ -156,11 +167,13 @@ function buildChartRows(chart: AdminDashboardChart): ChartRow[] {
       if (!byTimestamp.has(point.timestamp)) {
         byTimestamp.set(point.timestamp, {
           timestamp: point.timestamp,
-          timeLabel: new Date(point.timestamp).toLocaleTimeString("en-US", {
+          timeLabel: new Date(point.timestamp).toLocaleTimeString(
+            locale === "zh" ? "zh-CN" : "en-US",
+            {
+            hour12: false,
             hour: "2-digit",
             minute: "2-digit",
             second: "2-digit",
-            hour12: false,
           }),
         });
       }
@@ -178,6 +191,7 @@ function buildChartRows(chart: AdminDashboardChart): ChartRow[] {
 }
 
 export default function AdminDashboardPage() {
+  const [locale, setLocale] = useState<SiteLocale>("en");
   const [data, setData] = useState<AdminDashboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -192,9 +206,42 @@ export default function AdminDashboardPage() {
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
+  const copy = useMemo<SiteCopy>(() => getCopy(locale), [locale]);
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const syncLocale = () => {
+      const cookieValue = document.cookie
+        .split("; ")
+        .find((item) => item.startsWith(`${SITE_LOCALE_KEY}=`))
+        ?.split("=")
+        .slice(1)
+        .join("=");
+      const fromCookie = normalizeSiteLocale(
+        cookieValue ? decodeURIComponent(cookieValue) : null,
+      );
+      const fromStorage = normalizeSiteLocale(window.localStorage.getItem(SITE_LOCALE_KEY));
+      setLocale(fromCookie ?? fromStorage ?? "en");
+    };
+
+    const onLocaleChange = (event: Event) => {
+      const detail = (event as CustomEvent<SiteLocale>).detail;
+      const parsed = normalizeSiteLocale(detail);
+      if (parsed) {
+        setLocale(parsed);
+      }
+    };
+
+    syncLocale();
+    window.addEventListener("storage", syncLocale);
+    window.addEventListener("site-locale-change", onLocaleChange as EventListener);
+    return () => {
+      window.removeEventListener("storage", syncLocale);
+      window.removeEventListener("site-locale-change", onLocaleChange as EventListener);
+    };
   }, []);
 
   useEffect(() => {
@@ -352,7 +399,7 @@ export default function AdminDashboardPage() {
         home_hero_markdown: data.home_hero_markdown,
         updated_at: data.updated_at,
       });
-      setSettingsNotice("Saved. Site content updated immediately.");
+      setSettingsNotice(copy.admin.saveSuccess);
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to save site settings";
       setSettingsError(message);
@@ -364,7 +411,7 @@ export default function AdminDashboardPage() {
   if (!data && error) {
     return (
       <section className="w-full max-w-3xl border-4 border-ink bg-paper p-8 shadow-hard-sm">
-        <h1 className="font-headline text-4xl font-black uppercase">Admin Dashboard</h1>
+        <h1 className="font-headline text-4xl font-black uppercase">{copy.admin.title}</h1>
         <p className="mt-4 text-sm text-accent-red">{error}</p>
       </section>
     );
@@ -375,16 +422,16 @@ export default function AdminDashboardPage() {
       <section className="border-4 border-ink bg-paper p-6 shadow-hard-sm">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="font-headline text-4xl font-black uppercase">Crawler Dashboard</h1>
+            <h1 className="font-headline text-4xl font-black uppercase">{copy.admin.crawlerTitle}</h1>
             <p className="mt-2 text-sm text-ink-muted">
-              Full Prometheus metrics sampled every {data?.window.sample_interval_secs ?? 0}s.
+              {copy.admin.sampledEvery(data?.window.sample_interval_secs ?? 0)}
             </p>
           </div>
           <button
             onClick={logout}
             className="bauhaus-shadow-sm bauhaus-press border-2 border-ink bg-paper px-4 py-2 font-headline text-sm font-bold uppercase transition-all hover:bg-accent-yellow"
           >
-            Logout
+            {copy.admin.logout}
           </button>
         </div>
 
@@ -392,57 +439,59 @@ export default function AdminDashboardPage() {
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <article className="border-2 border-ink bg-paper-soft p-3">
-            <p className="text-xs uppercase text-ink-muted">Crawler Status</p>
+            <p className="text-xs uppercase text-ink-muted">{copy.admin.crawlerStatus}</p>
             <p className="font-headline text-2xl font-black uppercase">{data?.now.crawler_status ?? "-"}</p>
           </article>
           <article className="border-2 border-ink bg-paper-soft p-3">
-            <p className="text-xs uppercase text-ink-muted">Sampled At</p>
-            <p className="font-headline text-sm font-black uppercase">{formatTimestamp(data?.now.updated_at)}</p>
+            <p className="text-xs uppercase text-ink-muted">{copy.admin.sampledAt}</p>
+            <p className="font-headline text-sm font-black uppercase">
+              {formatTimestamp(data?.now.updated_at, locale)}
+            </p>
           </article>
           <article className="border-2 border-ink bg-paper-soft p-3">
-            <p className="text-xs uppercase text-ink-muted">Discovered Total</p>
+            <p className="text-xs uppercase text-ink-muted">{copy.admin.discoveredTotal}</p>
             <p className="font-headline text-2xl font-black uppercase">
               {formatCompact(data?.now.info_hash_discovered_total ?? 0)}
             </p>
           </article>
           <article className="border-2 border-ink bg-paper-soft p-3">
-            <p className="text-xs uppercase text-ink-muted">Metadata Success</p>
+            <p className="text-xs uppercase text-ink-muted">{copy.admin.metadataSuccess}</p>
             <p className="font-headline text-2xl font-black uppercase">
               {formatCompact(data?.now.metadata_fetch_success_total ?? 0)}
             </p>
           </article>
           <article className="border-2 border-ink bg-paper-soft p-3">
-            <p className="text-xs uppercase text-ink-muted">Metadata Fail</p>
+            <p className="text-xs uppercase text-ink-muted">{copy.admin.metadataFail}</p>
             <p className="font-headline text-2xl font-black uppercase">
               {formatCompact(data?.now.metadata_fetch_fail_total ?? 0)}
             </p>
           </article>
           <article className="border-2 border-ink bg-paper-soft p-3">
-            <p className="text-xs uppercase text-ink-muted">Metadata Success Rate</p>
+            <p className="text-xs uppercase text-ink-muted">{copy.admin.metadataSuccessRate}</p>
             <p className="font-headline text-2xl font-black uppercase">
               {formatPercent(data?.now.metadata_success_rate ?? 0)}
             </p>
           </article>
           <article className="border-2 border-ink bg-paper-soft p-3">
-            <p className="text-xs uppercase text-ink-muted">Metadata Queue</p>
+            <p className="text-xs uppercase text-ink-muted">{copy.admin.metadataQueue}</p>
             <p className="font-headline text-2xl font-black uppercase">
               {formatCompact(data?.now.metadata_queue_size ?? 0)}
             </p>
           </article>
           <article className="border-2 border-ink bg-paper-soft p-3">
-            <p className="text-xs uppercase text-ink-muted">Node Queue</p>
+            <p className="text-xs uppercase text-ink-muted">{copy.admin.nodeQueue}</p>
             <p className="font-headline text-2xl font-black uppercase">
               {formatCompact(data?.now.node_queue_size ?? 0)}
             </p>
           </article>
           <article className="border-2 border-ink bg-paper-soft p-3">
-            <p className="text-xs uppercase text-ink-muted">Worker Pressure</p>
+            <p className="text-xs uppercase text-ink-muted">{copy.admin.workerPressure}</p>
             <p className="font-headline text-2xl font-black uppercase">
               {formatPercent(data?.now.metadata_worker_pressure ?? 0)}
             </p>
           </article>
           <article className="border-2 border-ink bg-paper-soft p-3">
-            <p className="text-xs uppercase text-ink-muted">UDP Receive Drop Rate</p>
+            <p className="text-xs uppercase text-ink-muted">{copy.admin.udpReceiveDropRate}</p>
             <p className="font-headline text-2xl font-black uppercase">
               {formatPercent(data?.now.udp_receive_drop_rate ?? 0)}
             </p>
@@ -453,17 +502,15 @@ export default function AdminDashboardPage() {
       <section className="border-4 border-ink bg-paper p-6 shadow-hard-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-headline text-3xl font-black uppercase">Site Settings</h2>
-            <p className="mt-1 text-sm text-ink-muted">
-              Control metadata title/description and homepage hero markdown.
-            </p>
+            <h2 className="font-headline text-3xl font-black uppercase">{copy.admin.siteSettingsTitle}</h2>
+            <p className="mt-1 text-sm text-ink-muted">{copy.admin.siteSettingsDesc}</p>
           </div>
           <button
             onClick={saveSettings}
             disabled={settingsSaving || settingsLoading}
             className="bauhaus-shadow-sm bauhaus-press border-2 border-ink bg-accent-yellow px-4 py-2 font-headline text-sm font-black uppercase transition-all hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {settingsSaving ? "Saving..." : "Save Settings"}
+            {settingsSaving ? copy.admin.saving : copy.admin.saveSettings}
           </button>
         </div>
 
@@ -473,7 +520,7 @@ export default function AdminDashboardPage() {
         <div className="mt-5 grid gap-5 xl:grid-cols-2">
           <div className="space-y-4">
             <label className="block space-y-1">
-              <span className="text-xs font-bold uppercase text-ink-muted">Site Title</span>
+              <span className="text-xs font-bold uppercase text-ink-muted">{copy.admin.siteTitle}</span>
               <input
                 value={settings.site_title}
                 disabled={settingsLoading || settingsSaving}
@@ -486,7 +533,7 @@ export default function AdminDashboardPage() {
             </label>
 
             <label className="block space-y-1">
-              <span className="text-xs font-bold uppercase text-ink-muted">Site Description</span>
+              <span className="text-xs font-bold uppercase text-ink-muted">{copy.admin.siteDescription}</span>
               <textarea
                 value={settings.site_description}
                 disabled={settingsLoading || settingsSaving}
@@ -500,7 +547,7 @@ export default function AdminDashboardPage() {
             </label>
 
             <label className="block space-y-1">
-              <span className="text-xs font-bold uppercase text-ink-muted">Home Hero Markdown</span>
+              <span className="text-xs font-bold uppercase text-ink-muted">{copy.admin.homeHeroMarkdown}</span>
               <textarea
                 value={settings.home_hero_markdown}
                 disabled={settingsLoading || settingsSaving}
@@ -514,12 +561,12 @@ export default function AdminDashboardPage() {
             </label>
 
             <p className="text-xs uppercase text-ink-muted">
-              Updated at: {formatTimestamp(settings.updated_at ?? undefined)}
+              {copy.admin.updatedAt}: {formatTimestamp(settings.updated_at ?? undefined, locale)}
             </p>
           </div>
 
           <article className="border-2 border-ink bg-paper-soft p-4">
-            <p className="text-xs uppercase text-ink-muted">Hero Preview</p>
+            <p className="text-xs uppercase text-ink-muted">{copy.admin.heroPreview}</p>
             <div className="mt-3 font-headline text-5xl font-black uppercase leading-none tracking-tighter md:text-7xl">
               <ReactMarkdown
                 components={{
@@ -547,27 +594,32 @@ export default function AdminDashboardPage() {
                     : "bg-paper text-ink hover:bg-ink hover:text-paper"
                 }`}
               >
-                {tab.title}
+                {localizeAdminTabTitle(locale, tab.id, tab.title)}
               </button>
             );
           })}
         </div>
 
         <p className="text-xs uppercase text-ink-muted">
-          Window: {data?.window.points ?? 0} points · {Math.round((data?.window.horizon_secs ?? 0) / 60)} minutes
+          {copy.admin.window(
+            data?.window.points ?? 0,
+            Math.round((data?.window.horizon_secs ?? 0) / 60),
+          )}
         </p>
 
         <div className="grid gap-5 xl:grid-cols-2">
           {(activeTab?.charts ?? []).map((chart) => {
             const config = buildChartConfig(chart);
-            const rows = buildChartRows(chart);
+            const rows = buildChartRows(chart, locale);
             const isStacked = chart.render === "stacked";
 
             return (
               <article key={chart.id} className="border-2 border-ink bg-paper p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="font-headline text-xl font-black uppercase">{chart.title}</h2>
-                  <span className="text-xs uppercase text-ink-muted">Unit: {chart.unit}</span>
+                  <h2 className="font-headline text-xl font-black uppercase">
+                    {localizeAdminChartTitle(locale, chart.id, chart.title)}
+                  </h2>
+                  <span className="text-xs uppercase text-ink-muted">{copy.admin.unit(chart.unit)}</span>
                 </div>
 
                 {mounted ? (
@@ -576,7 +628,7 @@ export default function AdminDashboardPage() {
                       <ResponsiveContainer width="100%" height="100%">
                         {isStacked ? (
                           <AreaChart data={rows}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#c4bdb3" />
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--grid-line)" />
                             <XAxis dataKey="timeLabel" minTickGap={24} tick={{ fontSize: 11 }} />
                             <YAxis tick={{ fontSize: 11 }} />
                             <ChartTooltip content={<ChartTooltipContent />} />
@@ -598,7 +650,7 @@ export default function AdminDashboardPage() {
                           </AreaChart>
                         ) : (
                           <LineChart data={rows}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#c4bdb3" />
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--grid-line)" />
                             <XAxis dataKey="timeLabel" minTickGap={24} tick={{ fontSize: 11 }} />
                             <YAxis tick={{ fontSize: 11 }} />
                             <ChartTooltip content={<ChartTooltipContent />} />
@@ -620,7 +672,7 @@ export default function AdminDashboardPage() {
                     </ChartContainer>
                   ) : (
                     <div className="mt-4 flex h-72 items-center justify-center border border-dashed border-ink/40 text-sm text-ink-muted">
-                      No data yet for this chart.
+                      {copy.admin.noChartData}
                     </div>
                   )
                 ) : null}
@@ -632,7 +684,7 @@ export default function AdminDashboardPage() {
 
       {!data?.window.prometheus_enabled ? (
         <section className="border-4 border-ink bg-paper p-5 text-sm text-accent-red shadow-hard-sm">
-          Prometheus exporter is disabled or not initialized. Enable `CRAWLER_PROMETHEUS_ENABLED=true`.
+          {copy.admin.prometheusDisabled}
         </section>
       ) : null}
     </div>

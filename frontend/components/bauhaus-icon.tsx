@@ -7,7 +7,9 @@ import {
   Film,
   FileText,
   Home,
+  Languages,
   LayoutGrid,
+  Sun,
   Music,
   Moon,
   Search,
@@ -27,7 +29,9 @@ type BauhausIconName =
   | "audio"
   | "doc"
   | "app"
-  | "other";
+  | "other"
+  | "language"
+  | "light_mode";
 
 const ICONS: Record<BauhausIconName, ComponentType<LucideProps>> = {
   dark_mode: Moon,
@@ -42,6 +46,8 @@ const ICONS: Record<BauhausIconName, ComponentType<LucideProps>> = {
   doc: FileText,
   app: AppWindow,
   other: CircleEllipsis,
+  language: Languages,
+  light_mode: Sun,
 };
 
 export function BauhausIcon({

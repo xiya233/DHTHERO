@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 
 import { getFeatures, getTorrentDetail, getTorrentFiles } from "@/lib/api";
 import { formatBytes, formatDate } from "@/lib/format";
+import { getCopy, localizeCategoryLabel } from "@/lib/i18n";
+import { getServerSitePreferences } from "@/lib/site-preferences-server";
 
 type TorrentDetailPageProps = {
   params: Promise<{
@@ -10,6 +12,8 @@ type TorrentDetailPageProps = {
 };
 
 export default async function TorrentDetailPage({ params }: TorrentDetailPageProps) {
+  const { locale } = await getServerSitePreferences();
+  const copy = getCopy(locale);
   const { infoHash } = await params;
   const detail = await getTorrentDetail(infoHash);
   if (!detail) {
@@ -30,13 +34,27 @@ export default async function TorrentDetailPage({ params }: TorrentDetailPagePro
         <p className="mt-2 text-xs uppercase tracking-widest text-ink-muted">{detail.info_hash}</p>
 
         <div className="mt-5 grid gap-3 text-sm md:grid-cols-2">
-          <p>Category: {detail.category}</p>
-          <p>Total Size: {formatBytes(detail.total_size)}</p>
-          <p>Piece Length: {formatBytes(detail.piece_length)}</p>
-          <p>File Count: {detail.file_count}</p>
-          <p>First Seen: {formatDate(detail.first_seen_at)}</p>
-          <p>Last Seen: {formatDate(detail.last_seen_at)}</p>
-          <p>Hot Score: {detail.hot_score.toFixed(2)}</p>
+          <p>
+            {copy.torrent.category}: {localizeCategoryLabel(locale, detail.category, detail.category)}
+          </p>
+          <p>
+            {copy.torrent.totalSize}: {formatBytes(detail.total_size)}
+          </p>
+          <p>
+            {copy.torrent.pieceLength}: {formatBytes(detail.piece_length)}
+          </p>
+          <p>
+            {copy.torrent.fileCount}: {detail.file_count}
+          </p>
+          <p>
+            {copy.torrent.firstSeen}: {formatDate(detail.first_seen_at)}
+          </p>
+          <p>
+            {copy.torrent.lastSeen}: {formatDate(detail.last_seen_at)}
+          </p>
+          <p>
+            {copy.torrent.hotScore}: {detail.hot_score.toFixed(2)}
+          </p>
         </div>
 
         <div className="mt-6">
@@ -44,13 +62,13 @@ export default async function TorrentDetailPage({ params }: TorrentDetailPagePro
             href={detail.magnet_link}
             className="bauhaus-shadow-sm bauhaus-press inline-flex border-2 border-ink bg-accent-yellow px-4 py-2 font-headline text-sm font-black uppercase tracking-wider transition-all hover:bg-ink hover:text-paper"
           >
-            Open Magnet Link
+            {copy.torrent.openMagnet}
           </a>
         </div>
       </section>
 
       <section className="border-4 border-ink bg-paper p-6 shadow-hard-sm">
-        <h2 className="font-headline text-3xl font-black uppercase">Files</h2>
+        <h2 className="font-headline text-3xl font-black uppercase">{copy.torrent.files}</h2>
         {files.length > 0 ? (
           <ul className="mt-4 space-y-2 text-sm">
             {files.slice(0, 300).map((file) => (
@@ -60,7 +78,7 @@ export default async function TorrentDetailPage({ params }: TorrentDetailPagePro
                   style={{ paddingLeft: `${0.75 + file.depth * 0.8}rem` }}
                 >
                   <span className="truncate uppercase tracking-wide">
-                    {file.is_dir ? `[DIR] ${file.path}` : file.path}
+                    {file.is_dir ? `${copy.torrent.dirPrefix} ${file.path}` : file.path}
                   </span>
                   <span className="ml-3 shrink-0 text-xs text-ink-muted">
                     {file.is_dir ? "-" : formatBytes(file.size)}
@@ -70,7 +88,7 @@ export default async function TorrentDetailPage({ params }: TorrentDetailPagePro
             ))}
           </ul>
         ) : (
-          <p className="mt-4 text-sm text-ink-muted">No file entries available.</p>
+          <p className="mt-4 text-sm text-ink-muted">{copy.torrent.noFiles}</p>
         )}
       </section>
     </div>

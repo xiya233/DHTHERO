@@ -1,6 +1,8 @@
 import { Pagination } from "@/components/pagination";
 import { TorrentCard } from "@/components/torrent-card";
 import { getCategories, searchTorrents } from "@/lib/api";
+import { getCopy, localizeCategoryLabel } from "@/lib/i18n";
+import { getServerSitePreferences } from "@/lib/site-preferences-server";
 
 type SearchPageProps = {
   searchParams: Promise<{
@@ -12,15 +14,11 @@ type SearchPageProps = {
   }>;
 };
 
-const SORTS = [
-  { key: "relevance", label: "Relevance" },
-  { key: "latest", label: "Latest" },
-  { key: "hot", label: "Hot" },
-  { key: "size_desc", label: "Size Desc" },
-  { key: "size_asc", label: "Size Asc" },
-];
+const SORT_KEYS = ["relevance", "latest", "hot", "size_desc", "size_asc"] as const;
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
+  const { locale } = await getServerSitePreferences();
+  const copy = getCopy(locale);
   const params = await searchParams;
   const q = params.q?.trim() ?? "";
   const category = params.category?.trim() || "all";
@@ -33,8 +31,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   if (!q) {
     return (
       <section className="mx-auto max-w-3xl border-4 border-ink bg-paper p-8 text-center shadow-hard-sm">
-        <h1 className="font-headline text-4xl font-black uppercase">Search</h1>
-        <p className="mt-3 text-ink-muted">Provide keyword or info hash in query string.</p>
+        <h1 className="font-headline text-4xl font-black uppercase">{copy.search.emptyTitle}</h1>
+        <p className="mt-3 text-ink-muted">{copy.search.emptyHint}</p>
       </section>
     );
   }
@@ -50,8 +48,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   if (!result) {
     return (
       <section className="mx-auto max-w-3xl border-4 border-ink bg-paper p-8 text-center shadow-hard-sm">
-        <h1 className="font-headline text-4xl font-black uppercase">Search failed</h1>
-        <p className="mt-3 text-ink-muted">Backend API is unavailable.</p>
+        <h1 className="font-headline text-4xl font-black uppercase">{copy.search.failedTitle}</h1>
+        <p className="mt-3 text-ink-muted">{copy.search.failedHint}</p>
       </section>
     );
   }
@@ -59,7 +57,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   return (
     <div className="space-y-8">
       <section className="border-4 border-ink bg-paper p-6 shadow-hard-sm">
-        <h1 className="font-headline text-4xl font-black uppercase">Search Results</h1>
+        <h1 className="font-headline text-4xl font-black uppercase">{copy.search.resultTitle}</h1>
         <form action="/search" className="mt-5 grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
           <input
             name="q"
@@ -75,7 +73,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           >
             {categories.map((item) => (
               <option key={item.key} value={item.key}>
-                {item.label}
+                {localizeCategoryLabel(locale, item.key, item.label)}
               </option>
             ))}
           </select>
@@ -85,28 +83,35 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             defaultValue={sort}
             className="border-2 border-ink bg-paper px-3 py-2 font-headline text-sm font-bold uppercase"
           >
-            {SORTS.map((item) => (
-              <option key={item.key} value={item.key}>
-                {item.label}
+            {SORT_KEYS.map((sortKey) => (
+              <option key={sortKey} value={sortKey}>
+                {copy.search.sorts[sortKey]}
               </option>
             ))}
           </select>
 
           <button className="border-2 border-ink bg-accent-yellow px-4 py-2 font-headline text-sm font-black uppercase hover:bg-ink hover:text-paper">
-            Apply
+            {copy.search.apply}
           </button>
         </form>
         <p className="mt-4 text-sm uppercase tracking-wide text-ink-muted">
-          {result.total} matches · took {result.took_ms}ms
+          {copy.search.summary(result.total, result.took_ms)}
         </p>
       </section>
 
       <section className="space-y-4">
         {result.items.length > 0 ? (
-          result.items.map((item) => <TorrentCard key={item.info_hash} item={item} />)
+          result.items.map((item) => (
+            <TorrentCard
+              key={item.info_hash}
+              item={item}
+              locale={locale}
+              labels={copy.torrentCard}
+            />
+          ))
         ) : (
           <article className="border-4 border-ink bg-paper p-6 text-center shadow-hard-sm">
-            <p className="font-headline text-xl font-bold uppercase">No results</p>
+            <p className="font-headline text-xl font-bold uppercase">{copy.search.noResults}</p>
           </article>
         )}
       </section>
@@ -117,6 +122,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         pageSize={result.page_size}
         total={result.total}
         query={{ q, category, sort }}
+        labels={copy.pagination}
       />
     </div>
   );

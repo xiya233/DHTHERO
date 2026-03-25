@@ -1,6 +1,8 @@
 import { Pagination } from "@/components/pagination";
 import { TorrentCard } from "@/components/torrent-card";
 import { getCategories, getFeatures, getLatest } from "@/lib/api";
+import { getCopy, localizeCategoryLabel } from "@/lib/i18n";
+import { getServerSitePreferences } from "@/lib/site-preferences-server";
 
 type LatestPageProps = {
   searchParams: Promise<{
@@ -11,11 +13,13 @@ type LatestPageProps = {
 };
 
 export default async function LatestPage({ searchParams }: LatestPageProps) {
+  const { locale } = await getServerSitePreferences();
+  const copy = getCopy(locale);
   const features = await getFeatures();
   if (!features.latest_enabled) {
     return (
       <section className="mx-auto max-w-3xl border-4 border-ink bg-paper p-8 text-center shadow-hard-sm">
-        <h1 className="font-headline text-4xl font-black uppercase">Latest Disabled</h1>
+        <h1 className="font-headline text-4xl font-black uppercase">{copy.latest.disabled}</h1>
       </section>
     );
   }
@@ -37,7 +41,7 @@ export default async function LatestPage({ searchParams }: LatestPageProps) {
   if (!result) {
     return (
       <section className="mx-auto max-w-3xl border-4 border-ink bg-paper p-8 text-center shadow-hard-sm">
-        <h1 className="font-headline text-4xl font-black uppercase">Latest unavailable</h1>
+        <h1 className="font-headline text-4xl font-black uppercase">{copy.latest.unavailable}</h1>
       </section>
     );
   }
@@ -45,7 +49,7 @@ export default async function LatestPage({ searchParams }: LatestPageProps) {
   return (
     <div className="space-y-8">
       <section className="border-4 border-ink bg-paper p-6 shadow-hard-sm">
-        <h1 className="font-headline text-4xl font-black uppercase">Latest Torrents</h1>
+        <h1 className="font-headline text-4xl font-black uppercase">{copy.latest.title}</h1>
         <form action="/latest" className="mt-4 flex flex-wrap items-center gap-3">
           <select
             name="category"
@@ -54,22 +58,29 @@ export default async function LatestPage({ searchParams }: LatestPageProps) {
           >
             {categories.map((item) => (
               <option key={item.key} value={item.key}>
-                {item.label}
+                {localizeCategoryLabel(locale, item.key, item.label)}
               </option>
             ))}
           </select>
           <button className="bauhaus-shadow-sm bauhaus-press border-2 border-ink bg-accent-yellow px-4 py-2 font-headline text-sm font-black uppercase transition-all hover:bg-ink hover:text-paper">
-            Filter
+            {copy.latest.filter}
           </button>
         </form>
       </section>
 
       <section className="space-y-4">
         {result.items.length > 0 ? (
-          result.items.map((item) => <TorrentCard key={item.info_hash} item={item} />)
+          result.items.map((item) => (
+            <TorrentCard
+              key={item.info_hash}
+              item={item}
+              locale={locale}
+              labels={copy.torrentCard}
+            />
+          ))
         ) : (
           <article className="border-4 border-ink bg-paper p-6 text-center shadow-hard-sm">
-            <p className="font-headline text-xl font-bold uppercase">No data</p>
+            <p className="font-headline text-xl font-bold uppercase">{copy.latest.noData}</p>
           </article>
         )}
       </section>
@@ -80,6 +91,7 @@ export default async function LatestPage({ searchParams }: LatestPageProps) {
         pageSize={result.page_size}
         total={result.total}
         query={{ category }}
+        labels={copy.pagination}
       />
     </div>
   );

@@ -2,8 +2,29 @@ import Link from "next/link";
 
 import type { TorrentListItem } from "@/lib/api";
 import { formatBytes, formatDate } from "@/lib/format";
+import { localizeCategoryLabel, type SiteCopy } from "@/lib/i18n";
+import type { SiteLocale } from "@/lib/site-preferences";
 
-export function TorrentCard({ item }: { item: TorrentListItem }) {
+type TorrentCardProps = {
+  item: TorrentListItem;
+  locale?: SiteLocale;
+  labels?: SiteCopy["torrentCard"];
+};
+
+export function TorrentCard({ item, locale = "en", labels }: TorrentCardProps) {
+  const text = labels ?? {
+    untitled: "Untitled",
+    hash: "Hash",
+    size: "Size",
+    files: "Files",
+    hotScore: "Hot Score",
+    observations: "Observations",
+    firstSeen: "First Seen",
+    lastSeen: "Last Seen",
+    magnet: "Magnet",
+    details: "Details",
+  };
+
   return (
     <article className="border-4 border-ink bg-paper p-5 shadow-hard-sm">
       <header className="mb-3 flex items-start justify-between gap-4">
@@ -12,24 +33,36 @@ export function TorrentCard({ item }: { item: TorrentListItem }) {
             href={`/torrent/${item.info_hash}`}
             className="font-headline text-xl font-black uppercase tracking-tight hover:underline"
           >
-            {item.name || "Untitled"}
+            {item.name || text.untitled}
           </Link>
           <p className="mt-1 text-xs uppercase tracking-wide text-ink-muted">
-            HASH {item.info_hash}
+            {text.hash} {item.info_hash}
           </p>
         </div>
         <span className="border-2 border-ink bg-accent-yellow px-2 py-1 text-xs font-bold uppercase">
-          {item.category}
+          {localizeCategoryLabel(locale, item.category, item.category)}
         </span>
       </header>
 
       <div className="grid gap-2 text-sm text-ink md:grid-cols-2">
-        <p>Size: {formatBytes(item.total_size)}</p>
-        <p>Files: {item.file_count}</p>
-        <p>Hot Score: {item.trend_score.toFixed(2)}</p>
-        <p>Observations: {item.observations}</p>
-        <p>First Seen: {formatDate(item.first_seen_at)}</p>
-        <p>Last Seen: {formatDate(item.last_seen_at)}</p>
+        <p>
+          {text.size}: {formatBytes(item.total_size)}
+        </p>
+        <p>
+          {text.files}: {item.file_count}
+        </p>
+        <p>
+          {text.hotScore}: {item.trend_score.toFixed(2)}
+        </p>
+        <p>
+          {text.observations}: {item.observations}
+        </p>
+        <p>
+          {text.firstSeen}: {formatDate(item.first_seen_at)}
+        </p>
+        <p>
+          {text.lastSeen}: {formatDate(item.last_seen_at)}
+        </p>
       </div>
 
       <footer className="mt-4 flex flex-wrap gap-3 text-sm">
@@ -37,13 +70,13 @@ export function TorrentCard({ item }: { item: TorrentListItem }) {
           href={item.magnet_link}
           className="bauhaus-shadow-sm bauhaus-press inline-flex items-center justify-center border-2 border-ink bg-accent-yellow px-3 py-1 font-bold uppercase tracking-wide transition-all hover:bg-ink hover:text-paper"
         >
-          Magnet
+          {text.magnet}
         </a>
         <Link
           href={`/torrent/${item.info_hash}`}
           className="bauhaus-shadow-sm bauhaus-press inline-flex items-center justify-center border-2 border-ink bg-paper px-3 py-1 font-bold uppercase tracking-wide transition-all hover:bg-accent-blue hover:text-paper"
         >
-          Details
+          {text.details}
         </Link>
       </footer>
     </article>

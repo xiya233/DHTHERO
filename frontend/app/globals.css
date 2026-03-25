@@ -8,6 +8,21 @@
   --accent-yellow: #ffcc00;
   --accent-red: #e63b2e;
   --accent-blue: #0055ff;
+  --shadow-color: #1a1a1a;
+  --grid-line: rgba(26, 26, 26, 0.08);
+}
+
+[data-theme="dark"] {
+  --ink: #f7f3ea;
+  --ink-muted: #b8b2a8;
+  --paper: #101010;
+  --paper-soft: #171717;
+  --accent-yellow: #ffcc00;
+  --accent-red: #ff6b5f;
+  --accent-blue: #4f8dff;
+  --shadow-color: #000000;
+  --grid-line: rgba(247, 243, 234, 0.12);
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -35,26 +50,26 @@ body {
 }
 
 .bauhaus-shadow {
-  box-shadow: 6px 6px 0 0 var(--ink);
+  box-shadow: 6px 6px 0 0 var(--shadow-color);
 }
 
 .bauhaus-shadow-sm {
-  box-shadow: 4px 4px 0 0 var(--ink);
+  box-shadow: 4px 4px 0 0 var(--shadow-color);
 }
 
 .bauhaus-shadow-hover:hover {
-  box-shadow: 2px 2px 0 0 var(--ink);
+  box-shadow: 2px 2px 0 0 var(--shadow-color);
   transform: translate(2px, 2px);
 }
 
 .bauhaus-press:active {
   transform: translate(2px, 2px);
-  box-shadow: 0 0 0 0 var(--ink);
+  box-shadow: 0 0 0 0 var(--shadow-color);
 }
 
 .grid-paper {
   background-image:
-    linear-gradient(to right, rgba(26, 26, 26, 0.08) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(26, 26, 26, 0.08) 1px, transparent 1px);
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
   background-size: 24px 24px;
 }
