@@ -34,7 +34,7 @@ services:
       - app_net
 
   backend:
-    image: ghcr.io/${GHCR_NAMESPACE}/dht-backend:${APP_IMAGE_TAG:-latest}
+    image: ghcr.io/xiya233/dht-backend:${APP_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
       - ./docker/env/backend.env
@@ -45,6 +45,7 @@ services:
       - ./data/backend:/data
     ports:
       - "8080:8080"
+      - "6881:6881/udp"
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,7 +61,7 @@ services:
       - app_net
 
   frontend:
-    image: ghcr.io/${GHCR_NAMESPACE}/dht-frontend:${APP_IMAGE_TAG:-latest}
+    image: ghcr.io/xiya233/dht-frontend:${APP_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
       - ./docker/env/frontend.env

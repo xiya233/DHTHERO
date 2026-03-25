@@ -42,7 +42,7 @@ export default async function TorrentDetailPage({ params }: TorrentDetailPagePro
         <div className="mt-6">
           <a
             href={detail.magnet_link}
-            className="inline-flex border-2 border-ink bg-accent-yellow px-4 py-2 font-headline text-sm font-black uppercase tracking-wider hover:bg-ink hover:text-paper"
+            className="bauhaus-shadow-sm bauhaus-press inline-flex border-2 border-ink bg-accent-yellow px-4 py-2 font-headline text-sm font-black uppercase tracking-wider transition-all hover:bg-ink hover:text-paper"
           >
             Open Magnet Link
           </a>
