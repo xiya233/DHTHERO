@@ -1,22 +1,88 @@
+name: dht-stack
+
 services:
   postgres:
     image: postgres:17
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: dhtsearch
-    ports:
-      - "5432:5432"
+    restart: unless-stopped
+    env_file:
+      - ./docker/env/postgres.env
     volumes:
-      - pgdata_dht:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - app_net
+
   meilisearch:
     image: getmeili/meilisearch:v1.22
-    environment:
-      MEILI_NO_ANALYTICS: "true"
-    ports:
-      - "7700:7700"
+    restart: unless-stopped
+    env_file:
+      - ./docker/env/meilisearch.env
     volumes:
-      - meili_data:/meili_data
-volumes:
-  pgdata_dht:
-  meili_data:
+      - ./data/meilisearch:/meili_data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:7700/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - app_net
+
+  backend:
+    image: ghcr.io/${GHCR_NAMESPACE}/dht-backend:${APP_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - ./docker/env/backend.env
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+    volumes:
+      - ./data/backend:/data
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/v1/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - app_net
+
+  frontend:
+    image: ghcr.io/${GHCR_NAMESPACE}/dht-frontend:${APP_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - ./docker/env/frontend.env
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+    volumes:
+      - ./data/frontend:/data
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/ > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - app_net
+
+networks:
+  app_net:
+    driver: bridge

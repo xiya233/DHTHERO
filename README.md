@@ -9,6 +9,7 @@ Monorepo structure:
 
 - [mise](https://mise.jdx.dev/)
 - PostgreSQL 14+
+- Docker + Docker Compose
 
 ## Bootstrap
 
@@ -83,6 +84,73 @@ npx pnpm@latest dev
 ```
 
 Frontend starts on `http://localhost:3000` and calls backend through `NEXT_PUBLIC_API_BASE_URL`.
+
+## Production Docker Compose
+
+This repository includes a production-oriented compose stack:
+
+- `frontend` + `backend` use prebuilt GHCR images
+- `postgres` + `meilisearch` use official images
+- all services use bind mounts under `./data`
+- one command starts everything (`frontend + backend + postgres + meilisearch`)
+
+### 1) Prepare compose variables
+
+```bash
+cp .env.example .env
+```
+
+Set at least:
+
+- `GHCR_NAMESPACE` (your GitHub user/org)
+- `APP_IMAGE_TAG` (`latest`/`sha-*`/`v*`)
+- `PUID` and `PGID` (host user/group id for bind mount ownership)
+
+### 2) Prepare service env files
+
+```bash
+cp docker/env/postgres.env.example docker/env/postgres.env
+cp docker/env/meilisearch.env.example docker/env/meilisearch.env
+cp docker/env/backend.env.example docker/env/backend.env
+cp docker/env/frontend.env.example docker/env/frontend.env
+```
+
+Each variable in these files is documented inline with detailed comments and usage guidance.
+
+### 3) Prepare bind mount directories
+
+```bash
+mkdir -p data/frontend data/backend data/postgres data/meilisearch
+```
+
+### 4) Start all services
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+### 5) Access
+
+- Frontend: `http://localhost:3000`
+- Backend API: `http://localhost:8080`
+
+`postgres` and `meilisearch` are internal-only by default (not exposed to host ports).
+
+If you want to expose the stack through host-installed Nginx (not Dockerized Nginx), see:
+
+- [Nginx host reverse proxy guide](docs/nginx-host-reverse-proxy.md)
+
+## GHCR Publish Workflow
+
+GitHub Actions workflow: `.github/workflows/ghcr-publish.yml`
+
+- Trigger: push `main`, push tag `v*`, or manual dispatch
+- Publishes:
+  - `ghcr.io/<owner>/dht-backend`
+  - `ghcr.io/<owner>/dht-frontend`
+- Architectures: `linux/amd64`, `linux/arm64`
+- Tags: `latest` (default branch), `sha-<short>`, release tag names
 
 ## Core API
 
