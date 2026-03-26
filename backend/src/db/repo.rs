@@ -369,20 +369,37 @@ pub async fn trending_torrents(
     pool: &PgPool,
     params: &TrendingParams,
 ) -> Result<(Vec<TorrentListRow>, i64), sqlx::Error> {
-    let mut count_qb = QueryBuilder::<Postgres>::new(
-        "SELECT COUNT(DISTINCT hs.info_hash)::bigint AS total FROM torrent_hot_stats_hourly hs JOIN torrents t ON t.info_hash = hs.info_hash WHERE hs.bucket_hour >= NOW() - INTERVAL ",
-    );
-    count_qb.push(params.window.interval_literal());
-
-    if let Some(category) = params.category {
-        count_qb.push(" AND t.category = ");
-        count_qb.push_bind(category);
+    #[derive(sqlx::FromRow)]
+    struct TrendingRowWithTotal {
+        info_hash: String,
+        name: String,
+        magnet_link: String,
+        category: i16,
+        total_size: i64,
+        file_count: i32,
+        first_seen_at: chrono::DateTime<chrono::Utc>,
+        last_seen_at: chrono::DateTime<chrono::Utc>,
+        trend_score: f64,
+        observations: i64,
+        total_count: i64,
     }
-
-    let (total,): (i64,) = count_qb.build_query_as().fetch_one(pool).await?;
 
     let mut qb = QueryBuilder::<Postgres>::new(
         r#"
+        WITH aggregated AS (
+            SELECT
+                hs.info_hash,
+                COALESCE(SUM(hs.trend_score), 0)::double precision AS trend_score,
+                COALESCE(SUM(hs.observation_count), 0)::bigint AS observations
+            FROM torrent_hot_stats_hourly hs
+            WHERE hs.bucket_hour >= NOW() - INTERVAL
+        "#,
+    );
+    qb.push(params.window.interval_literal());
+    qb.push(
+        r#"
+            GROUP BY hs.info_hash
+        )
         SELECT
             t.info_hash,
             t.name,
@@ -392,32 +409,47 @@ pub async fn trending_torrents(
             t.file_count,
             t.first_seen_at,
             t.last_seen_at,
-            COALESCE(SUM(hs.trend_score), 0)::double precision AS trend_score,
-            COALESCE(SUM(hs.observation_count), 0)::bigint AS observations
-        FROM torrent_hot_stats_hourly hs
-        JOIN torrents t ON t.info_hash = hs.info_hash
-        WHERE hs.bucket_hour >= NOW() - INTERVAL
+            aggregated.trend_score,
+            aggregated.observations,
+            COUNT(*) OVER()::bigint AS total_count
+        FROM aggregated
+        JOIN torrents t ON t.info_hash = aggregated.info_hash
+        WHERE 1=1
         "#,
     );
-    qb.push(params.window.interval_literal());
 
     if let Some(category) = params.category {
         qb.push(" AND t.category = ");
         qb.push_bind(category);
     }
 
-    qb.push(
-        " GROUP BY t.info_hash, t.name, t.magnet_link, t.category, t.total_size, t.file_count, t.first_seen_at, t.last_seen_at",
-    );
-    qb.push(" ORDER BY trend_score DESC, observations DESC, t.last_seen_at DESC LIMIT ");
+    qb.push(" ORDER BY aggregated.trend_score DESC, aggregated.observations DESC, t.last_seen_at DESC LIMIT ");
     qb.push_bind(params.limit);
     qb.push(" OFFSET ");
     qb.push_bind(params.offset);
 
-    let items = qb
-        .build_query_as::<TorrentListRow>()
+    let rows = qb
+        .build_query_as::<TrendingRowWithTotal>()
         .fetch_all(pool)
         .await?;
+
+    let total = rows.first().map(|row| row.total_count).unwrap_or(0);
+    let items = rows
+        .into_iter()
+        .map(|row| TorrentListRow {
+            info_hash: row.info_hash,
+            name: row.name,
+            magnet_link: row.magnet_link,
+            category: row.category,
+            total_size: row.total_size,
+            file_count: row.file_count,
+            first_seen_at: row.first_seen_at,
+            last_seen_at: row.last_seen_at,
+            trend_score: row.trend_score,
+            observations: row.observations,
+        })
+        .collect();
+
     Ok((items, total))
 }
 
