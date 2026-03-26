@@ -29,12 +29,14 @@ export default async function TorrentDetailPage({ params }: TorrentDetailPagePro
   const magnetHref = safeMagnetHref(detail.magnet_link);
 
   return (
-    <div className="space-y-8">
-      <section className="border-4 border-ink bg-paper p-6 shadow-hard-sm">
-        <h1 className="font-headline text-4xl font-black uppercase tracking-tight">
+    <div className="w-full min-w-0 space-y-8">
+      <section className="w-full min-w-0 border-4 border-ink bg-paper p-6 shadow-hard-sm">
+        <h1 className="min-w-0 break-all font-headline text-4xl font-black uppercase tracking-tight">
           {detail.name}
         </h1>
-        <p className="mt-2 text-xs uppercase tracking-widest text-ink-muted">{detail.info_hash}</p>
+        <p className="mt-2 break-all text-xs uppercase tracking-widest text-ink-muted">
+          {detail.info_hash}
+        </p>
 
         <div className="mt-5 grid gap-3 text-sm md:grid-cols-2">
           <p>
@@ -79,17 +81,17 @@ export default async function TorrentDetailPage({ params }: TorrentDetailPagePro
         </div>
       </section>
 
-      <section className="border-4 border-ink bg-paper p-6 shadow-hard-sm">
+      <section className="w-full min-w-0 border-4 border-ink bg-paper p-6 shadow-hard-sm">
         <h2 className="font-headline text-3xl font-black uppercase">{copy.torrent.files}</h2>
         {files.length > 0 ? (
-          <ul className="mt-4 space-y-2 text-sm">
+          <ul className="mt-4 w-full min-w-0 space-y-2 text-sm">
             {files.slice(0, 300).map((file) => (
               <li key={`${file.path}-${file.is_dir ? "dir" : "file"}`}>
                 <div
-                  className="flex items-center justify-between border-2 border-ink bg-paper-soft px-3 py-2"
+                  className="flex w-full min-w-0 items-center justify-between border-2 border-ink bg-paper-soft px-3 py-2"
                   style={{ paddingLeft: `${0.75 + file.depth * 0.8}rem` }}
                 >
-                  <span className="truncate uppercase tracking-wide">
+                  <span className="min-w-0 flex-1 truncate uppercase tracking-wide">
                     {file.is_dir ? `${copy.torrent.dirPrefix} ${file.path}` : file.path}
                   </span>
                   <span className="ml-3 shrink-0 text-xs text-ink-muted">
