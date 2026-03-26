@@ -10,10 +10,11 @@ RUN corepack enable
 WORKDIR /workspace/frontend
 
 COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,target=/pnpm/store pnpm fetch --frozen-lockfile
+RUN --mount=type=cache,target=/pnpm/store pnpm install --frozen-lockfile --offline
 
 COPY frontend ./
-RUN pnpm build && pnpm prune --prod
+RUN --mount=type=cache,target=/pnpm/store pnpm build && pnpm prune --prod
 
 FROM node:22-bookworm-slim AS runtime
 

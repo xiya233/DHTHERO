@@ -1,12 +1,38 @@
 # syntax=docker/dockerfile:1.7
 
-FROM rust:1-bookworm AS builder
+FROM rust:1-bookworm AS chef
+
+RUN cargo install --locked cargo-chef
+
+FROM chef AS planner
 
 WORKDIR /workspace
 COPY backend ./backend
 
 WORKDIR /workspace/backend
-RUN cargo build --release
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS deps
+
+WORKDIR /workspace/backend
+COPY --from=planner /workspace/backend/recipe.json ./recipe.json
+
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+  --mount=type=cache,target=/usr/local/cargo/git \
+  --mount=type=cache,target=/workspace/backend/target \
+  cargo chef cook --release --recipe-path recipe.json
+
+FROM chef AS builder
+
+WORKDIR /workspace
+COPY --from=deps /workspace/backend/recipe.json /workspace/backend/recipe.json
+COPY backend ./backend
+
+WORKDIR /workspace/backend
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+  --mount=type=cache,target=/usr/local/cargo/git \
+  --mount=type=cache,target=/workspace/backend/target \
+  cargo build --release
 
 FROM debian:bookworm-slim AS runtime
 
