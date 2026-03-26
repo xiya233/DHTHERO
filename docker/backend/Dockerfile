@@ -14,15 +14,19 @@ RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS deps
 
+ARG TARGETPLATFORM
+
 WORKDIR /workspace/backend
 COPY --from=planner /workspace/backend/recipe.json ./recipe.json
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
   --mount=type=cache,target=/usr/local/cargo/git \
-  --mount=type=cache,target=/workspace/backend/target \
+  --mount=type=cache,id=cargo-target-${TARGETPLATFORM},target=/workspace/backend/target \
   cargo chef cook --release --recipe-path recipe.json
 
 FROM chef AS builder
+
+ARG TARGETPLATFORM
 
 WORKDIR /workspace
 COPY --from=deps /workspace/backend/recipe.json /workspace/backend/recipe.json
@@ -31,8 +35,11 @@ COPY backend ./backend
 WORKDIR /workspace/backend
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
   --mount=type=cache,target=/usr/local/cargo/git \
-  --mount=type=cache,target=/workspace/backend/target \
-  cargo build --release
+  --mount=type=cache,id=cargo-target-${TARGETPLATFORM},target=/workspace/backend/target \
+  cargo build --release \
+  && mkdir -p /workspace/out \
+  && cp /workspace/backend/target/release/backend /workspace/out/backend \
+  && test -x /workspace/out/backend
 
 FROM debian:bookworm-slim AS runtime
 
@@ -42,7 +49,7 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY --from=builder /workspace/backend/target/release/backend /usr/local/bin/backend
+COPY --from=builder /workspace/out/backend /usr/local/bin/backend
 COPY docker/backend/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/backend
