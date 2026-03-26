@@ -28,20 +28,20 @@ export function TorrentCard({ item, locale = "en", labels }: TorrentCardProps) {
   };
 
   return (
-    <article className="border-4 border-ink bg-paper p-5 shadow-hard-sm">
+    <article className="w-full min-w-0 border-4 border-ink bg-paper p-5 shadow-hard-sm">
       <header className="mb-3 flex items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0 flex-1">
           <Link
             href={`/torrent/${item.info_hash}`}
-            className="font-headline text-xl font-black uppercase tracking-tight hover:underline"
+            className="clamp-2 break-all font-headline text-xl font-black uppercase tracking-tight hover:underline"
           >
             {item.name || text.untitled}
           </Link>
-          <p className="mt-1 text-xs uppercase tracking-wide text-ink-muted">
+          <p className="mt-1 break-all text-xs uppercase tracking-wide text-ink-muted">
             {text.hash} {item.info_hash}
           </p>
         </div>
-        <span className="border-2 border-ink bg-accent-yellow px-2 py-1 text-xs font-bold uppercase">
+        <span className="shrink-0 border-2 border-ink bg-accent-yellow px-2 py-1 text-xs font-bold uppercase">
           {localizeCategoryLabel(locale, item.category, item.category)}
         </span>
       </header>

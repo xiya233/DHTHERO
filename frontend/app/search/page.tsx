@@ -55,7 +55,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="w-full min-w-0 space-y-8">
       <section className="border-4 border-ink bg-paper p-6 shadow-hard-sm">
         <h1 className="font-headline text-4xl font-black uppercase">{copy.search.resultTitle}</h1>
         <form action="/search" className="mt-5 grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
@@ -99,7 +99,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         </p>
       </section>
 
-      <section className="space-y-4">
+      <section className="w-full min-w-0 space-y-4">
         {result.items.length > 0 ? (
           result.items.map((item) => (
             <TorrentCard

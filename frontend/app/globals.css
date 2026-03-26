@@ -73,3 +73,10 @@ body {
     linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
   background-size: 24px 24px;
 }
+
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
